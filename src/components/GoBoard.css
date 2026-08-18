@@ -76,3 +76,14 @@
   fill: var(--danger);
   opacity: 0.85;
 }
+
+.stone-dead {
+  opacity: 0.35;
+}
+
+.dead-marker line {
+  stroke: var(--danger);
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  pointer-events: none;
+}

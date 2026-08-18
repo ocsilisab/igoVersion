@@ -1,7 +1,8 @@
-import { useCallback, useState } from "react";
-import type { BoardSize, GameState, Position } from "../types/game";
-import { createEmptyBoard, opponent, serializeBoard } from "../utils/board";
-import { calculateScore } from "../utils/scoring";
+import { useCallback, useMemo, useState } from "react";
+import type { BoardSize, GameState, Position, ScoreResult } from "../types/game";
+import { createEmptyBoard, opponent, posKey, serializeBoard } from "../utils/board";
+import { getGroup } from "../utils/liberties";
+import { calculateScore, removeDeadStones } from "../utils/scoring";
 import { tryMove, type MoveRejectionReason } from "../utils/move";
 
 const MOVE_ERROR_MESSAGES: Record<MoveRejectionReason, string> = {
@@ -20,6 +21,8 @@ function createInitialState(size: BoardSize): GameState {
     whiteCaptures: 0,
     consecutivePasses: 0,
     history: [serializeBoard(board)],
+    isScoring: false,
+    deadStones: new Set<string>(),
     gameOver: false,
     lastMove: null,
     winner: null,
@@ -35,7 +38,7 @@ export function useGoGame(initialSize: BoardSize = 9) {
     setLastError(null);
 
     setState((prev) => {
-      if (prev.gameOver) return prev;
+      if (prev.gameOver || prev.isScoring) return prev;
       const { board, boardSize, currentPlayer } = prev;
 
       const result = tryMove(board, boardSize, currentPlayer, pos, prev.history);
@@ -62,24 +65,59 @@ export function useGoGame(initialSize: BoardSize = 9) {
     setLastError(null);
 
     setState((prev) => {
-      if (prev.gameOver) return prev;
+      if (prev.gameOver || prev.isScoring) return prev;
 
       const consecutivePasses = prev.consecutivePasses + 1;
       const nextPlayer = opponent(prev.currentPlayer);
 
       if (consecutivePasses >= 2) {
-        const score = calculateScore(prev.board, prev.boardSize, prev.blackCaptures, prev.whiteCaptures);
-        return {
-          ...prev,
-          consecutivePasses,
-          currentPlayer: nextPlayer,
-          gameOver: true,
-          winner: score.winner,
-          score,
-        };
+        // Two passes in a row end active play, but the game isn't over yet: players
+        // first mark dead stones (toggleDeadGroup) and confirm with finalizeScoring.
+        return { ...prev, consecutivePasses, currentPlayer: nextPlayer, isScoring: true };
       }
 
       return { ...prev, consecutivePasses, currentPlayer: nextPlayer };
+    });
+  }, []);
+
+  const toggleDeadGroup = useCallback((pos: Position) => {
+    setState((prev) => {
+      if (!prev.isScoring) return prev;
+      if (prev.board[pos.row][pos.col] === null) return prev;
+
+      const group = getGroup(prev.board, pos, prev.boardSize);
+      const wasDead = prev.deadStones.has(posKey(pos));
+      const nextDeadStones = new Set(prev.deadStones);
+
+      for (const stonePos of group.stones) {
+        const key = posKey(stonePos);
+        if (wasDead) nextDeadStones.delete(key);
+        else nextDeadStones.add(key);
+      }
+
+      return { ...prev, deadStones: nextDeadStones };
+    });
+  }, []);
+
+  const finalizeScoring = useCallback(() => {
+    setState((prev) => {
+      if (!prev.isScoring) return prev;
+
+      const { board: cleanedBoard, deadBlack, deadWhite } = removeDeadStones(prev.board, prev.deadStones);
+      const blackCaptures = prev.blackCaptures + deadWhite;
+      const whiteCaptures = prev.whiteCaptures + deadBlack;
+      const score = calculateScore(cleanedBoard, prev.boardSize, blackCaptures, whiteCaptures);
+
+      return {
+        ...prev,
+        board: cleanedBoard,
+        blackCaptures,
+        whiteCaptures,
+        isScoring: false,
+        gameOver: true,
+        winner: score.winner,
+        score,
+      };
     });
   }, []);
 
@@ -95,5 +133,27 @@ export function useGoGame(initialSize: BoardSize = 9) {
 
   const isGameInProgress = state.history.length > 1 && !state.gameOver;
 
-  return { state, lastError, isGameInProgress, placeStone, pass, resetGame, changeBoardSize };
+  const scoringPreview: ScoreResult | null = useMemo(() => {
+    if (!state.isScoring) return null;
+    const { board: cleanedBoard, deadBlack, deadWhite } = removeDeadStones(state.board, state.deadStones);
+    return calculateScore(
+      cleanedBoard,
+      state.boardSize,
+      state.blackCaptures + deadWhite,
+      state.whiteCaptures + deadBlack
+    );
+  }, [state.isScoring, state.board, state.deadStones, state.boardSize, state.blackCaptures, state.whiteCaptures]);
+
+  return {
+    state,
+    lastError,
+    isGameInProgress,
+    scoringPreview,
+    placeStone,
+    pass,
+    toggleDeadGroup,
+    finalizeScoring,
+    resetGame,
+    changeBoardSize,
+  };
 }

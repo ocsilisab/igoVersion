@@ -1,5 +1,32 @@
 import type { Board, BoardSize, Player, Position, ScoreResult } from "../types/game";
-import { getNeighbors, posKey } from "./board";
+import { cloneBoard, getNeighbors, posKey } from "./board";
+
+export interface RemoveDeadStonesResult {
+  board: Board;
+  deadBlack: number;
+  deadWhite: number;
+}
+
+/**
+ * Removes every stone whose posKey is in `deadStones` from the board, returning the
+ * cleaned board plus how many stones of each color were removed — those counts become
+ * captures for the opponent when the final score is calculated.
+ */
+export function removeDeadStones(board: Board, deadStones: Set<string>): RemoveDeadStonesResult {
+  const cleaned = cloneBoard(board);
+  let deadBlack = 0;
+  let deadWhite = 0;
+
+  for (const key of deadStones) {
+    const [row, col] = key.split(",").map(Number);
+    const stone = cleaned[row][col];
+    if (stone === "black") deadBlack++;
+    else if (stone === "white") deadWhite++;
+    if (stone !== null) cleaned[row][col] = null;
+  }
+
+  return { board: cleaned, deadBlack, deadWhite };
+}
 
 interface EmptyRegion {
   region: Position[];

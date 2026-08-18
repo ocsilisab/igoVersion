@@ -1,4 +1,4 @@
-import type { Player } from "../types/game";
+import type { Player, ScoreResult } from "../types/game";
 
 interface GameInfoProps {
   currentPlayer: Player;
@@ -10,6 +10,9 @@ interface GameInfoProps {
   playerColor?: Player;
   aiColor?: Player;
   isAiThinking?: boolean;
+  /** True once both players have passed in a row and dead stones are being marked. */
+  isScoring?: boolean;
+  scoringPreview?: ScoreResult | null;
 }
 
 export default function GameInfo({
@@ -21,6 +24,8 @@ export default function GameInfo({
   playerColor,
   aiColor,
   isAiThinking,
+  isScoring,
+  scoringPreview,
 }: GameInfoProps) {
   const isVsAi = playerColor !== undefined && aiColor !== undefined;
 
@@ -38,15 +43,21 @@ export default function GameInfo({
         </div>
       )}
 
-      {!gameOver && (
-        <div className="turn-indicator">
-          <span className={`stone-dot stone-dot-${currentPlayer}`} />
-          {isVsAi
-            ? currentPlayer === playerColor
-              ? "Tu turno"
-              : "Turno de la IA"
-            : `Turno de ${currentPlayer === "black" ? "Negras" : "Blancas"}`}
+      {isScoring ? (
+        <div className="scoring-notice">
+          Fin de la partida: marca las piedras muertas y pulsa <strong>Finalizar partida</strong>.
         </div>
+      ) : (
+        !gameOver && (
+          <div className="turn-indicator">
+            <span className={`stone-dot stone-dot-${currentPlayer}`} />
+            {isVsAi
+              ? currentPlayer === playerColor
+                ? "Tu turno"
+                : "Turno de la IA"
+              : `Turno de ${currentPlayer === "black" ? "Negras" : "Blancas"}`}
+          </div>
+        )
       )}
 
       {isVsAi && isAiThinking && !gameOver && <div className="ai-thinking">La IA está pensando…</div>}
@@ -60,7 +71,13 @@ export default function GameInfo({
         </span>
       </div>
 
-      {consecutivePasses > 0 && !gameOver && (
+      {isScoring && scoringPreview && (
+        <div className="scoring-estimate">
+          Estimado: Negras {scoringPreview.blackScore} · Blancas {scoringPreview.whiteScore}
+        </div>
+      )}
+
+      {!isScoring && consecutivePasses > 0 && !gameOver && (
         <div className="pass-indicator">
           {consecutivePasses === 1 ? "Un jugador ha pasado" : "Ambos jugadores han pasado"}
         </div>

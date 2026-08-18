@@ -110,6 +110,18 @@
   font-style: italic;
 }
 
+.scoring-notice {
+  width: 100%;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.scoring-estimate {
+  width: 100%;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
 .game-controls {
   width: 100%;
   max-width: 640px;

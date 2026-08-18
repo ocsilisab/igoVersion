@@ -19,7 +19,7 @@ export function useAiGoGame(initialSize: BoardSize, aiColor: Player) {
   const isThinkingRef = useRef(false);
 
   useEffect(() => {
-    if (state.gameOver) return;
+    if (state.gameOver || state.isScoring) return;
     if (state.currentPlayer !== aiColor) return;
     if (isThinkingRef.current) return;
 

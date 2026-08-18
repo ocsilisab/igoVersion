@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import type { Board, BoardSize, Position } from "../types/game";
+import { posKey } from "../utils/board";
 import "./GoBoard.css";
 
 interface GoBoardProps {
@@ -10,6 +11,13 @@ interface GoBoardProps {
   disabled?: boolean;
   /** When set, dims the board and shows this text (e.g. "La IA está pensando…"). */
   overlayText?: string;
+  /**
+   * Scoring/dead-stone-marking mode: when `onToggleDead` is provided, clicking any stone
+   * toggles it (and its whole group) instead of placing a new one — `onPlaceStone` and
+   * `disabled` are ignored for stone cells while this is active.
+   */
+  deadStones?: Set<string>;
+  onToggleDead?: (pos: Position) => void;
 }
 
 const STAR_POINTS: Record<BoardSize, Position[]> = {
@@ -43,7 +51,17 @@ const STAR_POINTS: Record<BoardSize, Position[]> = {
 const VIEW_SIZE = 100;
 const MARGIN = 6;
 
-export default function GoBoard({ board, boardSize, lastMove, onPlaceStone, disabled, overlayText }: GoBoardProps) {
+export default function GoBoard({
+  board,
+  boardSize,
+  lastMove,
+  onPlaceStone,
+  disabled,
+  overlayText,
+  deadStones,
+  onToggleDead,
+}: GoBoardProps) {
+  const isScoringMode = Boolean(onToggleDead);
   const step = (VIEW_SIZE - MARGIN * 2) / (boardSize - 1);
   const coord = (i: number) => MARGIN + i * step;
   const starPoints = STAR_POINTS[boardSize] ?? [];
@@ -75,7 +93,14 @@ export default function GoBoard({ board, boardSize, lastMove, onPlaceStone, disa
             const cy = coord(row);
             const isEmpty = stone === null;
             const isLastMove = lastMove?.row === row && lastMove?.col === col;
-            const canPlace = !disabled && isEmpty;
+            const isDead = stone !== null && (deadStones?.has(posKey({ row, col })) ?? false);
+            const canPlace = !isScoringMode && !disabled && isEmpty;
+            const canToggleDead = isScoringMode && stone !== null;
+
+            const handleClick = () => {
+              if (canToggleDead) onToggleDead!({ row, col });
+              else if (canPlace) onPlaceStone({ row, col });
+            };
 
             return (
               <g key={`${row}-${col}`}>
@@ -83,13 +108,24 @@ export default function GoBoard({ board, boardSize, lastMove, onPlaceStone, disa
                   cx={cx}
                   cy={cy}
                   r={step * 0.48}
-                  className={`cell-hit ${canPlace ? "cell-hit-active" : ""}`}
-                  onClick={() => canPlace && onPlaceStone({ row, col })}
+                  className={`cell-hit ${canPlace || canToggleDead ? "cell-hit-active" : ""}`}
+                  onClick={handleClick}
                 />
                 {stone && (
-                  <circle cx={cx} cy={cy} r={step * 0.45} className={`stone stone-${stone}`} />
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={step * 0.45}
+                    className={`stone stone-${stone} ${isDead ? "stone-dead" : ""}`}
+                  />
                 )}
-                {isLastMove && stone && (
+                {isDead && (
+                  <g className="dead-marker">
+                    <line x1={cx - step * 0.22} y1={cy - step * 0.22} x2={cx + step * 0.22} y2={cy + step * 0.22} />
+                    <line x1={cx - step * 0.22} y1={cy + step * 0.22} x2={cx + step * 0.22} y2={cy - step * 0.22} />
+                  </g>
+                )}
+                {isLastMove && stone && !isDead && (
                   <circle cx={cx} cy={cy} r={step * 0.16} className="last-move-marker" />
                 )}
               </g>

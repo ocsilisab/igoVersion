@@ -16,10 +16,20 @@ interface AiGameScreenProps {
 
 export default function AiGameScreen({ boardSize, playerColor, onExit }: AiGameScreenProps) {
   const aiColor: Player = playerColor === "black" ? "white" : "black";
-  const { state, lastError, isAiThinking, placeStone, pass, resetGame } = useAiGoGame(boardSize, aiColor);
+  const {
+    state,
+    lastError,
+    isAiThinking,
+    scoringPreview,
+    placeStone,
+    pass,
+    toggleDeadGroup,
+    finalizeScoring,
+    resetGame,
+  } = useAiGoGame(boardSize, aiColor);
   const [confirmReset, setConfirmReset] = useState(false);
 
-  const isPlayerTurn = !state.gameOver && !isAiThinking && state.currentPlayer === playerColor;
+  const isPlayerTurn = !state.gameOver && !state.isScoring && !isAiThinking && state.currentPlayer === playerColor;
 
   const confirmResetGame = () => {
     resetGame();
@@ -47,6 +57,8 @@ export default function AiGameScreen({ boardSize, playerColor, onExit }: AiGameS
         playerColor={playerColor}
         aiColor={aiColor}
         isAiThinking={isAiThinking}
+        isScoring={state.isScoring}
+        scoringPreview={scoringPreview}
       />
 
       {lastError && <p className="error-banner">{lastError}</p>}
@@ -58,9 +70,17 @@ export default function AiGameScreen({ boardSize, playerColor, onExit }: AiGameS
         onPlaceStone={placeStone}
         disabled={!isPlayerTurn}
         overlayText={isAiThinking ? "La IA está pensando…" : undefined}
+        deadStones={state.isScoring ? state.deadStones : undefined}
+        onToggleDead={state.isScoring ? toggleDeadGroup : undefined}
       />
 
-      <GameControls onPass={pass} onReset={() => setConfirmReset(true)} disabled={!isPlayerTurn} />
+      <GameControls
+        onPass={pass}
+        onReset={() => setConfirmReset(true)}
+        disabled={!isPlayerTurn}
+        isScoring={state.isScoring}
+        onFinalize={finalizeScoring}
+      />
 
       {confirmReset && (
         <ConfirmModal

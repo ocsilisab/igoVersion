@@ -32,6 +32,10 @@ export interface GameState {
   consecutivePasses: number;
   /** Serialized board states, one per move played (index 0 = empty board). Used to enforce the Ko rule. */
   history: string[];
+  /** True after both players pass in a row: no more moves, board is shown for dead-stone marking. */
+  isScoring: boolean;
+  /** posKey ("row,col") of every stone currently marked dead during the scoring phase. */
+  deadStones: Set<string>;
   gameOver: boolean;
   lastMove: Position | null;
   winner: Player | "draw" | null;

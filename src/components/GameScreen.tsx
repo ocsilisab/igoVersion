@@ -14,7 +14,18 @@ interface GameScreenProps {
 }
 
 export default function GameScreen({ onExit }: GameScreenProps) {
-  const { state, lastError, isGameInProgress, placeStone, pass, resetGame, changeBoardSize } = useGoGame(9);
+  const {
+    state,
+    lastError,
+    isGameInProgress,
+    scoringPreview,
+    placeStone,
+    pass,
+    toggleDeadGroup,
+    finalizeScoring,
+    resetGame,
+    changeBoardSize,
+  } = useGoGame(9);
   const [pendingSize, setPendingSize] = useState<BoardSize | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
 
@@ -55,6 +66,8 @@ export default function GameScreen({ onExit }: GameScreenProps) {
         whiteCaptures={state.whiteCaptures}
         consecutivePasses={state.consecutivePasses}
         gameOver={state.gameOver}
+        isScoring={state.isScoring}
+        scoringPreview={scoringPreview}
       />
 
       {lastError && <p className="error-banner">{lastError}</p>}
@@ -64,10 +77,18 @@ export default function GameScreen({ onExit }: GameScreenProps) {
         boardSize={state.boardSize}
         lastMove={state.lastMove}
         onPlaceStone={placeStone}
-        disabled={state.gameOver}
+        disabled={state.gameOver || state.isScoring}
+        deadStones={state.isScoring ? state.deadStones : undefined}
+        onToggleDead={state.isScoring ? toggleDeadGroup : undefined}
       />
 
-      <GameControls onPass={pass} onReset={() => setConfirmReset(true)} disabled={state.gameOver} />
+      <GameControls
+        onPass={pass}
+        onReset={() => setConfirmReset(true)}
+        disabled={state.gameOver || state.isScoring}
+        isScoring={state.isScoring}
+        onFinalize={finalizeScoring}
+      />
 
       {pendingSize !== null && (
         <ConfirmModal
