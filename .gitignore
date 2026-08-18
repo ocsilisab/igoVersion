@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Environment variables (never commit real secrets — see .env.example)
+.env
+.env.*
+!.env.example
+.vercel
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

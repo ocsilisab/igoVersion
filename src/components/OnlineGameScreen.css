@@ -1,0 +1,65 @@
+.online-status-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+
+.online-code-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 32px;
+  margin: 8px 0;
+}
+
+.online-code-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.online-code-value {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+}
+
+.online-waiting {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.online-players-row {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.connection-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.connection-connected {
+  color: var(--accent);
+}
+
+.connection-reconnecting {
+  color: var(--danger);
+}

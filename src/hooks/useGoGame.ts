@@ -1,15 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
 import type { BoardSize, GameState, Position, ScoreResult } from "../types/game";
-import { createEmptyBoard, opponent, posKey, serializeBoard } from "../utils/board";
-import { getGroup } from "../utils/liberties";
+import { createEmptyBoard, opponent, serializeBoard } from "../utils/board";
 import { calculateScore, removeDeadStones } from "../utils/scoring";
-import { tryMove, type MoveRejectionReason } from "../utils/move";
-
-const MOVE_ERROR_MESSAGES: Record<MoveRejectionReason, string> = {
-  occupied: "No puedes colocar una piedra sobre otra piedra.",
-  suicide: "Movimiento suicida: ese grupo se quedaría sin libertades.",
-  ko: "Movimiento no permitido por la regla del Ko.",
-};
+import { toggleDeadStoneGroup } from "../utils/deadStones";
+import { tryMove, MOVE_ERROR_MESSAGES } from "../utils/move";
 
 function createInitialState(size: BoardSize): GameState {
   const board = createEmptyBoard(size);
@@ -83,18 +77,7 @@ export function useGoGame(initialSize: BoardSize = 9) {
   const toggleDeadGroup = useCallback((pos: Position) => {
     setState((prev) => {
       if (!prev.isScoring) return prev;
-      if (prev.board[pos.row][pos.col] === null) return prev;
-
-      const group = getGroup(prev.board, pos, prev.boardSize);
-      const wasDead = prev.deadStones.has(posKey(pos));
-      const nextDeadStones = new Set(prev.deadStones);
-
-      for (const stonePos of group.stones) {
-        const key = posKey(stonePos);
-        if (wasDead) nextDeadStones.delete(key);
-        else nextDeadStones.add(key);
-      }
-
+      const nextDeadStones = toggleDeadStoneGroup(prev.board, prev.boardSize, pos, prev.deadStones);
       return { ...prev, deadStones: nextDeadStones };
     });
   }, []);

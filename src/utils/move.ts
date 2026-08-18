@@ -10,6 +10,13 @@ export type MoveResult =
   | { ok: true; board: Board; capturedCount: number; boardState: string }
   | { ok: false; reason: MoveRejectionReason };
 
+/** Shared, user-facing message per rejection reason — reused by every caller (local hook, online API). */
+export const MOVE_ERROR_MESSAGES: Record<MoveRejectionReason, string> = {
+  occupied: "No puedes colocar una piedra sobre otra piedra.",
+  suicide: "Movimiento suicida: ese grupo se quedaría sin libertades.",
+  ko: "Movimiento no permitido por la regla del Ko.",
+};
+
 /**
  * Applies `player`'s stone placement at `pos` to `board` following the full rule set
  * (occupancy, captures, suicide, Ko) without touching any component/hook state.
