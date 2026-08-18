@@ -1,0 +1,79 @@
+.setup-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.setup-content {
+  max-width: 420px;
+  width: 100%;
+}
+
+.setup-title {
+  font-size: 2rem;
+  margin: 16px 0 4px;
+}
+
+.setup-subtitle {
+  margin-bottom: 28px;
+}
+
+.setup-section {
+  margin-bottom: 28px;
+}
+
+.setup-section h2 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+.setup-options {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.setup-option {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.setup-option:hover {
+  border-color: var(--text-muted);
+}
+
+.setup-option-active {
+  border-color: var(--accent);
+  background: var(--accent-bg, rgba(47, 111, 82, 0.1));
+  color: var(--accent);
+}
+
+.setup-hint {
+  margin-top: 10px;
+  font-size: 0.85rem;
+}
+
+.setup-start {
+  width: 100%;
+  font-size: 1.1rem;
+  padding: 16px;
+}

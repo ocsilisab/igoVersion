@@ -8,6 +8,8 @@ interface GoBoardProps {
   lastMove: Position | null;
   onPlaceStone: (pos: Position) => void;
   disabled?: boolean;
+  /** When set, dims the board and shows this text (e.g. "La IA está pensando…"). */
+  overlayText?: string;
 }
 
 const STAR_POINTS: Record<BoardSize, Position[]> = {
@@ -41,7 +43,7 @@ const STAR_POINTS: Record<BoardSize, Position[]> = {
 const VIEW_SIZE = 100;
 const MARGIN = 6;
 
-export default function GoBoard({ board, boardSize, lastMove, onPlaceStone, disabled }: GoBoardProps) {
+export default function GoBoard({ board, boardSize, lastMove, onPlaceStone, disabled, overlayText }: GoBoardProps) {
   const step = (VIEW_SIZE - MARGIN * 2) / (boardSize - 1);
   const coord = (i: number) => MARGIN + i * step;
   const starPoints = STAR_POINTS[boardSize] ?? [];
@@ -95,6 +97,12 @@ export default function GoBoard({ board, boardSize, lastMove, onPlaceStone, disa
           })
         )}
       </svg>
+
+      {overlayText && (
+        <div className="go-board-overlay">
+          <span>{overlayText}</span>
+        </div>
+      )}
     </div>
   );
 }

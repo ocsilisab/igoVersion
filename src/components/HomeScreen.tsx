@@ -2,9 +2,10 @@ import "./HomeScreen.css";
 
 interface HomeScreenProps {
   onPlaySolo: () => void;
+  onPlayAi: () => void;
 }
 
-export default function HomeScreen({ onPlaySolo }: HomeScreenProps) {
+export default function HomeScreen({ onPlaySolo, onPlayAi }: HomeScreenProps) {
   return (
     <div className="home-screen">
       <div className="home-content">
@@ -19,9 +20,8 @@ export default function HomeScreen({ onPlaySolo }: HomeScreenProps) {
             Jugar solo
           </button>
 
-          <button className="home-btn home-btn-disabled" disabled>
+          <button className="home-btn" onClick={onPlayAi}>
             Jugar con IA
-            <span className="badge">Próximamente</span>
           </button>
 
           <button className="home-btn home-btn-disabled" disabled>

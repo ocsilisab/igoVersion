@@ -6,6 +6,10 @@ interface GameInfoProps {
   whiteCaptures: number;
   consecutivePasses: number;
   gameOver: boolean;
+  /** Present only in "vs IA" mode; when set together with aiColor, shows player/IA roles. */
+  playerColor?: Player;
+  aiColor?: Player;
+  isAiThinking?: boolean;
 }
 
 export default function GameInfo({
@@ -14,15 +18,38 @@ export default function GameInfo({
   whiteCaptures,
   consecutivePasses,
   gameOver,
+  playerColor,
+  aiColor,
+  isAiThinking,
 }: GameInfoProps) {
+  const isVsAi = playerColor !== undefined && aiColor !== undefined;
+
   return (
     <div className="game-info">
+      {isVsAi && (
+        <div className="vs-ai-roles">
+          <span>
+            <span className={`stone-dot stone-dot-${playerColor}`} /> Jugador:{" "}
+            {playerColor === "black" ? "Negras" : "Blancas"}
+          </span>
+          <span>
+            <span className={`stone-dot stone-dot-${aiColor}`} /> IA: {aiColor === "black" ? "Negras" : "Blancas"}
+          </span>
+        </div>
+      )}
+
       {!gameOver && (
         <div className="turn-indicator">
           <span className={`stone-dot stone-dot-${currentPlayer}`} />
-          Turno de {currentPlayer === "black" ? "Negras" : "Blancas"}
+          {isVsAi
+            ? currentPlayer === playerColor
+              ? "Tu turno"
+              : "Turno de la IA"
+            : `Turno de ${currentPlayer === "black" ? "Negras" : "Blancas"}`}
         </div>
       )}
+
+      {isVsAi && isAiThinking && !gameOver && <div className="ai-thinking">La IA está pensando…</div>}
 
       <div className="captures-row">
         <span className="capture-item">

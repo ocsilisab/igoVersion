@@ -1,10 +1,14 @@
 import { useCallback, useState } from "react";
 import type { BoardSize, GameState, Position } from "../types/game";
-import { cloneBoard, createEmptyBoard, opponent, serializeBoard } from "../utils/board";
-import { removeDeadGroups } from "../utils/capture";
-import { getGroup } from "../utils/liberties";
-import { violatesKo } from "../utils/ko";
+import { createEmptyBoard, opponent, serializeBoard } from "../utils/board";
 import { calculateScore } from "../utils/scoring";
+import { tryMove, type MoveRejectionReason } from "../utils/move";
+
+const MOVE_ERROR_MESSAGES: Record<MoveRejectionReason, string> = {
+  occupied: "No puedes colocar una piedra sobre otra piedra.",
+  suicide: "Movimiento suicida: ese grupo se quedaría sin libertades.",
+  ko: "Movimiento no permitido por la regla del Ko.",
+};
 
 function createInitialState(size: BoardSize): GameState {
   const board = createEmptyBoard(size);
@@ -34,37 +38,21 @@ export function useGoGame(initialSize: BoardSize = 9) {
       if (prev.gameOver) return prev;
       const { board, boardSize, currentPlayer } = prev;
 
-      if (board[pos.row][pos.col] !== null) {
-        setLastError("No puedes colocar una piedra sobre otra piedra.");
+      const result = tryMove(board, boardSize, currentPlayer, pos, prev.history);
+      if (!result.ok) {
+        setLastError(MOVE_ERROR_MESSAGES[result.reason]);
         return prev;
       }
-
-      const candidateBoard = cloneBoard(board);
-      candidateBoard[pos.row][pos.col] = currentPlayer;
 
       const opponentColor = opponent(currentPlayer);
-      const { board: afterCapture, capturedCount } = removeDeadGroups(candidateBoard, opponentColor, boardSize);
-
-      const ownGroup = getGroup(afterCapture, pos, boardSize);
-      if (ownGroup.liberties.size === 0) {
-        setLastError("Movimiento suicida: ese grupo se quedaría sin libertades.");
-        return prev;
-      }
-
-      const candidateState = serializeBoard(afterCapture);
-      if (violatesKo(candidateState, prev.history)) {
-        setLastError("Movimiento no permitido por la regla del Ko.");
-        return prev;
-      }
-
       return {
         ...prev,
-        board: afterCapture,
+        board: result.board,
         currentPlayer: opponentColor,
-        blackCaptures: prev.blackCaptures + (currentPlayer === "black" ? capturedCount : 0),
-        whiteCaptures: prev.whiteCaptures + (currentPlayer === "white" ? capturedCount : 0),
+        blackCaptures: prev.blackCaptures + (currentPlayer === "black" ? result.capturedCount : 0),
+        whiteCaptures: prev.whiteCaptures + (currentPlayer === "white" ? result.capturedCount : 0),
         consecutivePasses: 0,
-        history: [...prev.history, candidateState],
+        history: [...prev.history, result.boardState],
         lastMove: pos,
       };
     });
