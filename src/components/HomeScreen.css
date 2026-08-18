@@ -1,0 +1,67 @@
+.home-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.home-content {
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+}
+
+.home-title {
+  font-size: 3rem;
+  margin-bottom: 12px;
+  letter-spacing: -1px;
+}
+
+.home-subtitle {
+  margin-bottom: 40px;
+  font-size: 1.05rem;
+}
+
+.home-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.home-btn {
+  position: relative;
+  font-family: inherit;
+  font-size: 1.1rem;
+  font-weight: 600;
+  padding: 18px 24px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.home-btn:active {
+  transform: scale(0.98);
+}
+
+.home-btn-primary {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+  box-shadow: var(--shadow);
+}
+
+.home-btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.home-btn-disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

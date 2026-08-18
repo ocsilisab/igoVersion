@@ -1,0 +1,60 @@
+.go-board-wrapper {
+  width: 100%;
+  max-width: 640px;
+  aspect-ratio: 1 / 1;
+}
+
+.go-board-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: manipulation;
+}
+
+.board-bg {
+  fill: var(--board-color);
+}
+
+.board-line {
+  stroke: var(--board-line);
+  stroke-width: 0.25;
+  vector-effect: non-scaling-stroke;
+}
+
+.star-point {
+  fill: var(--board-line);
+}
+
+.cell-hit {
+  fill: transparent;
+}
+
+.cell-hit-active {
+  cursor: pointer;
+}
+
+.cell-hit-active:hover {
+  fill: rgba(0, 0, 0, 0.08);
+}
+
+.stone {
+  pointer-events: none;
+}
+
+.stone-black {
+  fill: var(--stone-black);
+  filter: drop-shadow(0 0.6px 0.8px rgba(0, 0, 0, 0.5));
+}
+
+.stone-white {
+  fill: var(--stone-white);
+  stroke: var(--stone-white-lo);
+  stroke-width: 0.3;
+  filter: drop-shadow(0 0.6px 0.8px rgba(0, 0, 0, 0.35));
+}
+
+.last-move-marker {
+  pointer-events: none;
+  fill: var(--danger);
+  opacity: 0.85;
+}

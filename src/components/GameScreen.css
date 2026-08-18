@@ -1,0 +1,90 @@
+.game-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  gap: 12px;
+}
+
+.game-header {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.game-title {
+  font-size: 1.4rem;
+}
+
+.board-selector {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  gap: 2px;
+}
+
+.board-selector-select {
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.game-info {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 0.95rem;
+}
+
+.turn-indicator {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+}
+
+.captures-row {
+  display: flex;
+  gap: 16px;
+  color: var(--text-muted);
+}
+
+.capture-item {
+  display: flex;
+  align-items: center;
+}
+
+.pass-indicator {
+  width: 100%;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.game-controls {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 4px;
+}
