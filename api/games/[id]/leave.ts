@@ -7,10 +7,12 @@ import { readGuestId } from "../../_lib/session.js";
 import { leaveGame } from "../../_lib/gameRepo.js";
 
 /**
- * Voluntary abandon. Idempotent: leaving an already-finished/abandoned game just
- * returns it as-is. If the leaver's team still has other active members, the game
- * continues without them (their rotation slot is skipped if it was their turn); only
- * once a whole team hits zero active members does the game become `abandoned`.
+ * Voluntary leave/abandon. Idempotent: leaving an already-finished/abandoned game just
+ * returns it as-is. Behavior depends on when it happens — see gameRepo.ts::leaveGame:
+ * before the game starts, the creator leaving cancels the room, but anyone else leaving
+ * just frees their seat back to "pending" for someone else to claim; mid-game, the game
+ * continues without the leaver (their rotation slot is skipped if it was their turn)
+ * unless it was the last active member of their team, which ends the game.
  */
 export default withHandler(["POST"], async (req: VercelRequest, res: VercelResponse) => {
   const allowed = await checkRateLimit(req, { action: "leave", limit: 20, windowSeconds: 60 });

@@ -385,6 +385,38 @@ export async function leaveGame(id: string, guestId: string | null): Promise<Onl
   if (game.status === "finished" || game.status === "abandoned") return game;
 
   const supabase = getSupabaseAdmin();
+
+  if (game.status === "waiting") {
+    if (me.isCreator) {
+      // "Cancelar partida": the creator leaving the waiting room ends it outright,
+      // regardless of who else is there — matches the button's label.
+      const { error } = await supabase
+        .from("game_players")
+        .update({ left_at: new Date().toISOString() })
+        .eq("game_id", game.id)
+        .eq("guest_id", guestId);
+      if (error) throw Errors.serverError();
+      return applyGameUpdate(game, { status: "abandoned", abandoned_team: me.team });
+    }
+
+    // Anyone else leaving before the game starts just frees their seat back up — it
+    // goes back to "pending" (fresh token) so someone else can claim it, instead of
+    // permanently shrinking the room below what the creator configured.
+    const { error } = await supabase
+      .from("game_players")
+      .update({
+        guest_id: null,
+        display_name: null,
+        joined_at: null,
+        invite_token: randomBytes(16).toString("hex"),
+      })
+      .eq("game_id", game.id)
+      .eq("guest_id", guestId);
+    if (error) throw Errors.serverError();
+    return applyGameUpdate(game, {});
+  }
+
+  // Mid-game: soft-delete (left_at), so turn rotation and the roster stay auditable.
   const { error } = await supabase
     .from("game_players")
     .update({ left_at: new Date().toISOString() })
@@ -393,13 +425,8 @@ export async function leaveGame(id: string, guestId: string | null): Promise<Onl
   if (error) throw Errors.serverError();
 
   const teammatesLeft = game.players.filter((p) => p.team === me.team && p.active && p.guestId !== guestId);
-
   if (teammatesLeft.length === 0) {
     return applyGameUpdate(game, { status: "abandoned", abandoned_team: me.team });
-  }
-
-  if (game.status === "waiting") {
-    return applyGameUpdate(game, {});
   }
 
   // If it was exactly this player's turn, bump the rotation so their team isn't stuck
