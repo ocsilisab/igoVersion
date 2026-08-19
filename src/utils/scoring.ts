@@ -62,15 +62,18 @@ function floodFillEmptyRegion(board: Board, start: Position, size: BoardSize, vi
 }
 
 /**
- * Simple area-style scoring: stones on the board + surrounded territory + captures.
- * Territory is only awarded to a connected region of empty points bordered by exactly one color;
- * regions touching both colors (or no stones at all) are neutral.
+ * Simple area-style scoring: stones on the board + surrounded territory + captures,
+ * plus komi (a fixed compensation added to White's score to offset Black's first-move
+ * advantage — see types/game.ts::KOMI_OPTIONS). Territory is only awarded to a connected
+ * region of empty points bordered by exactly one color; regions touching both colors
+ * (or no stones at all) are neutral.
  */
 export function calculateScore(
   board: Board,
   size: BoardSize,
   blackCaptures: number,
-  whiteCaptures: number
+  whiteCaptures: number,
+  komi: number
 ): ScoreResult {
   let blackStones = 0;
   let whiteStones = 0;
@@ -104,7 +107,7 @@ export function calculateScore(
   }
 
   const blackScore = blackStones + blackTerritory + blackCaptures;
-  const whiteScore = whiteStones + whiteTerritory + whiteCaptures;
+  const whiteScore = whiteStones + whiteTerritory + whiteCaptures + komi;
 
   let winner: Player | "draw";
   if (blackScore > whiteScore) winner = "black";
@@ -118,6 +121,7 @@ export function calculateScore(
     whiteTerritory,
     blackCaptures,
     whiteCaptures,
+    komi,
     blackScore,
     whiteScore,
     winner,

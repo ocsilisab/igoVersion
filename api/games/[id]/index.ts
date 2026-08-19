@@ -19,7 +19,7 @@ export default withHandler(["GET"], async (req: VercelRequest, res: VercelRespon
 
   const guestId = readGuestId(req);
   const color = resolveColor(game, guestId);
-  const displayName = color === "black" ? game.blackName : color === "white" ? (game.whiteName ?? "") : "";
+  const displayName = (color === "black" ? game.blackName : color === "white" ? game.whiteName : null) ?? "";
 
   const response: GameResponse = {
     game,

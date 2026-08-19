@@ -23,7 +23,7 @@ export default withHandler(["POST"], async (req: VercelRequest, res: VercelRespo
   const { board: cleanedBoard, deadBlack, deadWhite } = removeDeadStones(game.board, new Set(game.deadStones));
   const blackCaptures = game.blackCaptures + deadWhite;
   const whiteCaptures = game.whiteCaptures + deadBlack;
-  const score = calculateScore(cleanedBoard, game.boardSize, blackCaptures, whiteCaptures);
+  const score = calculateScore(cleanedBoard, game.boardSize, blackCaptures, whiteCaptures, game.komi);
 
   const updated = await applyGameUpdate(game, {
     board: cleanedBoard,

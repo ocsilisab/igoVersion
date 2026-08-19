@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import type { BoardSize } from "../../src/types/game.js";
+import type { BoardSize, Player } from "../../src/types/game.js";
+import { KOMI_OPTIONS } from "../../src/types/game.js";
 import type { GameResponse } from "../../src/online/types.js";
 import { withHandler, readBody } from "../_lib/http.js";
 import { checkRateLimit } from "../_lib/rateLimit.js";
@@ -11,6 +12,8 @@ const VALID_SIZES: BoardSize[] = [9, 13, 19];
 
 interface CreateGameBody {
   boardSize?: number;
+  komi?: number;
+  creatorColor?: string;
   displayName?: string;
 }
 
@@ -24,13 +27,25 @@ export default withHandler(["POST"], async (req: VercelRequest, res: VercelRespo
   if (!VALID_SIZES.includes(body.boardSize as BoardSize)) {
     throw Errors.badRequest("Tamaño de tablero no válido.");
   }
+  if (typeof body.komi !== "number" || !KOMI_OPTIONS.includes(body.komi)) {
+    throw Errors.badRequest("Komi no válido.");
+  }
+  if (body.creatorColor !== "black" && body.creatorColor !== "white") {
+    throw Errors.badRequest("Color no válido.");
+  }
 
   const displayName = sanitizeDisplayName(body.displayName) ?? defaultGuestName(guestId);
-  const game = await createGame({ boardSize: body.boardSize as BoardSize, guestId, displayName });
+  const game = await createGame({
+    boardSize: body.boardSize as BoardSize,
+    komi: body.komi,
+    creatorColor: body.creatorColor as Player,
+    guestId,
+    displayName,
+  });
 
   const response: GameResponse = {
     game,
-    you: { guestId, userType: "guest", color: "black", displayName },
+    you: { guestId, userType: "guest", color: body.creatorColor as Player, displayName },
   };
   res.status(201).json(response);
 });

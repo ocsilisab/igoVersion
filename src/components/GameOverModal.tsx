@@ -42,6 +42,11 @@ export default function GameOverModal({ score, onPlayAgain, onExit }: GameOverMo
               <td>{score.blackCaptures}</td>
               <td>{score.whiteCaptures}</td>
             </tr>
+            <tr>
+              <td>Komi</td>
+              <td>—</td>
+              <td>{score.komi}</td>
+            </tr>
             <tr className="total-row">
               <td>Total</td>
               <td>{score.blackScore}</td>

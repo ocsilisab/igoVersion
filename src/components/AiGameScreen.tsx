@@ -11,10 +11,11 @@ import "./GameScreen.css";
 interface AiGameScreenProps {
   boardSize: BoardSize;
   playerColor: Player;
+  komi: number;
   onExit: () => void;
 }
 
-export default function AiGameScreen({ boardSize, playerColor, onExit }: AiGameScreenProps) {
+export default function AiGameScreen({ boardSize, playerColor, komi, onExit }: AiGameScreenProps) {
   const aiColor: Player = playerColor === "black" ? "white" : "black";
   const {
     state,
@@ -26,7 +27,7 @@ export default function AiGameScreen({ boardSize, playerColor, onExit }: AiGameS
     toggleDeadGroup,
     finalizeScoring,
     resetGame,
-  } = useAiGoGame(boardSize, aiColor);
+  } = useAiGoGame(boardSize, aiColor, komi);
   const [confirmReset, setConfirmReset] = useState(false);
 
   const isPlayerTurn = !state.gameOver && !state.isScoring && !isAiThinking && state.currentPlayer === playerColor;
@@ -44,7 +45,7 @@ export default function AiGameScreen({ boardSize, playerColor, onExit }: AiGameS
         </button>
         <h1 className="game-title">Go · vs IA</h1>
         <span className="board-size-label">
-          {state.boardSize} × {state.boardSize}
+          {state.boardSize} × {state.boardSize} · Komi {state.komi}
         </span>
       </header>
 

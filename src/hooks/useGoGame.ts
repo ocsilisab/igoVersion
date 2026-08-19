@@ -1,15 +1,17 @@
 import { useCallback, useMemo, useState } from "react";
 import type { BoardSize, GameState, Position, ScoreResult } from "../types/game";
+import { DEFAULT_KOMI } from "../types/game";
 import { createEmptyBoard, opponent, serializeBoard } from "../utils/board";
 import { calculateScore, removeDeadStones } from "../utils/scoring";
 import { toggleDeadStoneGroup } from "../utils/deadStones";
 import { tryMove, MOVE_ERROR_MESSAGES } from "../utils/move";
 
-function createInitialState(size: BoardSize): GameState {
+function createInitialState(size: BoardSize, komi: number): GameState {
   const board = createEmptyBoard(size);
   return {
     board,
     boardSize: size,
+    komi,
     currentPlayer: "black",
     blackCaptures: 0,
     whiteCaptures: 0,
@@ -24,8 +26,8 @@ function createInitialState(size: BoardSize): GameState {
   };
 }
 
-export function useGoGame(initialSize: BoardSize = 9) {
-  const [state, setState] = useState<GameState>(() => createInitialState(initialSize));
+export function useGoGame(initialSize: BoardSize = 9, initialKomi: number = DEFAULT_KOMI) {
+  const [state, setState] = useState<GameState>(() => createInitialState(initialSize, initialKomi));
   const [lastError, setLastError] = useState<string | null>(null);
 
   const placeStone = useCallback((pos: Position) => {
@@ -89,7 +91,7 @@ export function useGoGame(initialSize: BoardSize = 9) {
       const { board: cleanedBoard, deadBlack, deadWhite } = removeDeadStones(prev.board, prev.deadStones);
       const blackCaptures = prev.blackCaptures + deadWhite;
       const whiteCaptures = prev.whiteCaptures + deadBlack;
-      const score = calculateScore(cleanedBoard, prev.boardSize, blackCaptures, whiteCaptures);
+      const score = calculateScore(cleanedBoard, prev.boardSize, blackCaptures, whiteCaptures, prev.komi);
 
       return {
         ...prev,
@@ -104,17 +106,10 @@ export function useGoGame(initialSize: BoardSize = 9) {
     });
   }, []);
 
-  const resetGame = useCallback((size?: BoardSize) => {
+  const resetGame = useCallback(() => {
     setLastError(null);
-    setState((prev) => createInitialState(size ?? prev.boardSize));
+    setState((prev) => createInitialState(prev.boardSize, prev.komi));
   }, []);
-
-  const changeBoardSize = useCallback((size: BoardSize) => {
-    setLastError(null);
-    setState(() => createInitialState(size));
-  }, []);
-
-  const isGameInProgress = state.history.length > 1 && !state.gameOver;
 
   const scoringPreview: ScoreResult | null = useMemo(() => {
     if (!state.isScoring) return null;
@@ -123,20 +118,19 @@ export function useGoGame(initialSize: BoardSize = 9) {
       cleanedBoard,
       state.boardSize,
       state.blackCaptures + deadWhite,
-      state.whiteCaptures + deadBlack
+      state.whiteCaptures + deadBlack,
+      state.komi
     );
-  }, [state.isScoring, state.board, state.deadStones, state.boardSize, state.blackCaptures, state.whiteCaptures]);
+  }, [state.isScoring, state.board, state.deadStones, state.boardSize, state.blackCaptures, state.whiteCaptures, state.komi]);
 
   return {
     state,
     lastError,
-    isGameInProgress,
     scoringPreview,
     placeStone,
     pass,
     toggleDeadGroup,
     finalizeScoring,
     resetGame,
-    changeBoardSize,
   };
 }

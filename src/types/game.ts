@@ -11,6 +11,10 @@ export interface Position {
   col: number;
 }
 
+/** Standard compensation points awarded to White at scoring time, to offset Black's first-move advantage. */
+export const KOMI_OPTIONS: readonly number[] = [0, 6.5, 7.5];
+export const DEFAULT_KOMI = 6.5;
+
 export interface ScoreResult {
   blackStones: number;
   whiteStones: number;
@@ -18,6 +22,7 @@ export interface ScoreResult {
   whiteTerritory: number;
   blackCaptures: number;
   whiteCaptures: number;
+  komi: number;
   blackScore: number;
   whiteScore: number;
   winner: Player | "draw";
@@ -26,6 +31,7 @@ export interface ScoreResult {
 export interface GameState {
   board: Board;
   boardSize: BoardSize;
+  komi: number;
   currentPlayer: Player;
   blackCaptures: number;
   whiteCaptures: number;

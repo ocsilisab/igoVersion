@@ -13,6 +13,7 @@ interface GameRow {
   code: string;
   version: number;
   board_size: number;
+  komi: number;
   board: Board;
   current_player: Player;
   black_captures: number;
@@ -25,9 +26,9 @@ interface GameRow {
   status: OnlineGameStatus;
   winner: OnlineGame["winner"];
   score: OnlineGame["score"];
-  black_player_id: string;
+  black_player_id: string | null;
   white_player_id: string | null;
-  black_name: string;
+  black_name: string | null;
   white_name: string | null;
   abandoned_by: Player | null;
   created_at: string;
@@ -41,6 +42,7 @@ function rowToGame(row: GameRow): OnlineGame {
     code: row.code,
     version: row.version,
     boardSize: row.board_size as BoardSize,
+    komi: row.komi,
     board: row.board,
     currentPlayer: row.current_player,
     blackCaptures: row.black_captures,
@@ -92,14 +94,27 @@ async function findGameByCode(code: string): Promise<OnlineGame | null> {
 
 export interface CreateGameInput {
   boardSize: BoardSize;
+  komi: number;
+  creatorColor: Player;
   guestId: string;
   displayName: string;
 }
 
-export async function createGame({ boardSize, guestId, displayName }: CreateGameInput): Promise<OnlineGame> {
+export async function createGame({
+  boardSize,
+  komi,
+  creatorColor,
+  guestId,
+  displayName,
+}: CreateGameInput): Promise<OnlineGame> {
   const supabase = getSupabaseAdmin();
   const board = createEmptyBoard(boardSize);
   const expiresAt = new Date(Date.now() + WAITING_TTL_MINUTES * 60 * 1000).toISOString();
+
+  const seat =
+    creatorColor === "black"
+      ? { black_player_id: guestId, black_name: displayName }
+      : { white_player_id: guestId, white_name: displayName };
 
   for (let attempt = 0; attempt < CREATE_CODE_ATTEMPTS; attempt++) {
     const code = generateGameCode();
@@ -108,12 +123,12 @@ export async function createGame({ boardSize, guestId, displayName }: CreateGame
       .insert({
         code,
         board_size: boardSize,
+        komi,
         board,
         current_player: "black",
         history: [serializeBoard(board)],
         status: "waiting",
-        black_player_id: guestId,
-        black_name: displayName,
+        ...seat,
         expires_at: expiresAt,
       })
       .select("*")
@@ -143,20 +158,26 @@ export async function joinGame({ code, guestId, displayName }: JoinGameInput): P
   }
 
   if (isExpiredWaitingGame(game)) throw Errors.expired();
-  if (game.status !== "waiting" || game.whitePlayerId !== null) throw Errors.full();
+  if (game.status !== "waiting") throw Errors.full();
+
+  // The creator could have taken either color — whichever seat is still empty is the joiner's.
+  const openColor: Player | null =
+    game.blackPlayerId === null ? "black" : game.whitePlayerId === null ? "white" : null;
+  if (!openColor) throw Errors.full();
+
+  const seat =
+    openColor === "black"
+      ? { black_player_id: guestId, black_name: displayName }
+      : { white_player_id: guestId, white_name: displayName };
+  const emptySeatColumn = openColor === "black" ? "black_player_id" : "white_player_id";
 
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("games")
-    .update({
-      white_player_id: guestId,
-      white_name: displayName,
-      status: "playing",
-      version: game.version + 1,
-    })
+    .update({ ...seat, status: "playing", version: game.version + 1 })
     .eq("id", game.id)
     .eq("version", game.version)
-    .is("white_player_id", null)
+    .is(emptySeatColumn, null)
     .select("*")
     .maybeSingle();
 

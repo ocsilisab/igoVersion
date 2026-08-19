@@ -12,8 +12,8 @@ const AI_MAX_THINK_MS = 1000;
  * delay it asks ai/chooseMove for a move and feeds it through the same `placeStone` /
  * `pass` calls a human player would use, so it goes through identical validation.
  */
-export function useAiGoGame(initialSize: BoardSize, aiColor: Player) {
-  const game = useGoGame(initialSize);
+export function useAiGoGame(initialSize: BoardSize, aiColor: Player, initialKomi: number) {
+  const game = useGoGame(initialSize, initialKomi);
   const { state, placeStone, pass } = game;
   const [isAiThinking, setIsAiThinking] = useState(false);
   const isThinkingRef = useRef(false);

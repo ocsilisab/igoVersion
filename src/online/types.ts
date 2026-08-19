@@ -22,6 +22,7 @@ export interface OnlineGame {
   version: number;
 
   boardSize: BoardSize;
+  komi: number;
   board: Board;
   currentPlayer: Player;
   blackCaptures: number;
@@ -36,9 +37,9 @@ export interface OnlineGame {
   winner: Player | "draw" | null;
   score: ScoreResult | null;
 
-  blackPlayerId: string;
+  blackPlayerId: string | null;
   whitePlayerId: string | null;
-  blackName: string;
+  blackName: string | null;
   whiteName: string | null;
   abandonedBy: Player | null;
 

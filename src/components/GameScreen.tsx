@@ -4,46 +4,22 @@ import type { BoardSize } from "../types/game";
 import GoBoard from "./GoBoard";
 import GameInfo from "./GameInfo";
 import GameControls from "./GameControls";
-import BoardSelector from "./BoardSelector";
 import ConfirmModal from "./ConfirmModal";
 import GameOverModal from "./GameOverModal";
 import "./GameScreen.css";
 
 interface GameScreenProps {
+  boardSize: BoardSize;
+  komi: number;
   onExit: () => void;
 }
 
-export default function GameScreen({ onExit }: GameScreenProps) {
-  const {
-    state,
-    lastError,
-    isGameInProgress,
-    scoringPreview,
-    placeStone,
-    pass,
-    toggleDeadGroup,
-    finalizeScoring,
-    resetGame,
-    changeBoardSize,
-  } = useGoGame(9);
-  const [pendingSize, setPendingSize] = useState<BoardSize | null>(null);
+export default function GameScreen({ boardSize, komi, onExit }: GameScreenProps) {
+  const { state, lastError, scoringPreview, placeStone, pass, toggleDeadGroup, finalizeScoring, resetGame } = useGoGame(
+    boardSize,
+    komi
+  );
   const [confirmReset, setConfirmReset] = useState(false);
-
-  const handleSizeRequest = (size: BoardSize) => {
-    if (size === state.boardSize) return;
-    if (isGameInProgress) {
-      setPendingSize(size);
-    } else {
-      changeBoardSize(size);
-    }
-  };
-
-  const confirmSizeChange = () => {
-    if (pendingSize !== null) {
-      changeBoardSize(pendingSize);
-      setPendingSize(null);
-    }
-  };
 
   const confirmResetGame = () => {
     resetGame();
@@ -57,7 +33,9 @@ export default function GameScreen({ onExit }: GameScreenProps) {
           ← Inicio
         </button>
         <h1 className="game-title">Go</h1>
-        <BoardSelector currentSize={state.boardSize} onSelect={handleSizeRequest} />
+        <span className="board-size-label">
+          {state.boardSize} × {state.boardSize} · Komi {state.komi}
+        </span>
       </header>
 
       <GameInfo
@@ -89,15 +67,6 @@ export default function GameScreen({ onExit }: GameScreenProps) {
         isScoring={state.isScoring}
         onFinalize={finalizeScoring}
       />
-
-      {pendingSize !== null && (
-        <ConfirmModal
-          title="Cambiar tamaño del tablero"
-          message="Hay una partida en curso. Cambiar el tamaño del tablero reiniciará la partida. ¿Quieres continuar?"
-          onConfirm={confirmSizeChange}
-          onCancel={() => setPendingSize(null)}
-        />
-      )}
 
       {confirmReset && (
         <ConfirmModal

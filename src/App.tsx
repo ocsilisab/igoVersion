@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import HomeScreen from "./components/HomeScreen";
+import SoloSetup from "./components/SoloSetup";
 import GameScreen from "./components/GameScreen";
 import GameSetup from "./components/GameSetup";
 import AiGameScreen from "./components/AiGameScreen";
@@ -12,6 +13,7 @@ import "./App.css";
 
 type Screen =
   | "home"
+  | "solo-setup"
   | "solo-game"
   | "ai-setup"
   | "ai-game"
@@ -20,9 +22,15 @@ type Screen =
   | "online-join"
   | "online-game";
 
+interface SoloConfig {
+  boardSize: BoardSize;
+  komi: number;
+}
+
 interface AiConfig {
   boardSize: BoardSize;
   playerColor: Player;
+  komi: number;
 }
 
 /**
@@ -37,6 +45,7 @@ function readGameIdFromUrl(): string | null {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>(() => (readGameIdFromUrl() ? "online-game" : "home"));
+  const [soloConfig, setSoloConfig] = useState<SoloConfig | null>(null);
   const [aiConfig, setAiConfig] = useState<AiConfig | null>(null);
   const [onlineGameId, setOnlineGameId] = useState<string | null>(() => readGameIdFromUrl());
 
@@ -69,23 +78,35 @@ export default function App() {
   if (screen === "home") {
     return (
       <HomeScreen
-        onPlaySolo={() => setScreen("solo-game")}
+        onPlaySolo={() => setScreen("solo-setup")}
         onPlayAi={() => setScreen("ai-setup")}
         onPlayOnline={() => setScreen("online-setup")}
       />
     );
   }
 
-  if (screen === "solo-game") {
-    return <GameScreen onExit={() => setScreen("home")} />;
+  if (screen === "solo-setup") {
+    return (
+      <SoloSetup
+        onCancel={() => setScreen("home")}
+        onStart={(boardSize, komi) => {
+          setSoloConfig({ boardSize, komi });
+          setScreen("solo-game");
+        }}
+      />
+    );
+  }
+
+  if (screen === "solo-game" && soloConfig) {
+    return <GameScreen boardSize={soloConfig.boardSize} komi={soloConfig.komi} onExit={() => setScreen("home")} />;
   }
 
   if (screen === "ai-setup") {
     return (
       <GameSetup
         onCancel={() => setScreen("home")}
-        onStart={(boardSize, playerColor) => {
-          setAiConfig({ boardSize, playerColor });
+        onStart={(boardSize, playerColor, komi) => {
+          setAiConfig({ boardSize, playerColor, komi });
           setScreen("ai-game");
         }}
       />
@@ -97,6 +118,7 @@ export default function App() {
       <AiGameScreen
         boardSize={aiConfig.boardSize}
         playerColor={aiConfig.playerColor}
+        komi={aiConfig.komi}
         onExit={() => setScreen("home")}
       />
     );

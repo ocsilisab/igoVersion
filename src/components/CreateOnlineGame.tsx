@@ -1,6 +1,8 @@
 import { useState } from "react";
-import type { BoardSize } from "../types/game";
+import type { BoardSize, Player } from "../types/game";
+import { DEFAULT_KOMI } from "../types/game";
 import { createOnlineGame, OnlineApiError } from "../online/api";
+import KomiSelector from "./KomiSelector";
 import "./GameSetup.css";
 
 interface CreateOnlineGameProps {
@@ -12,6 +14,8 @@ const BOARD_SIZES: BoardSize[] = [9, 13, 19];
 
 export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGameProps) {
   const [boardSize, setBoardSize] = useState<BoardSize>(9);
+  const [creatorColor, setCreatorColor] = useState<Player>("black");
+  const [komi, setKomi] = useState<number>(DEFAULT_KOMI);
   const [displayName, setDisplayName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +24,7 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
     setIsCreating(true);
     setError(null);
     try {
-      const { game } = await createOnlineGame(boardSize, displayName.trim() || undefined);
+      const { game } = await createOnlineGame(boardSize, komi, creatorColor, displayName.trim() || undefined);
       onCreated(game.id);
     } catch (err) {
       setError(err instanceof OnlineApiError ? err.message : "No se ha podido crear la partida.");
@@ -36,7 +40,7 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
         </button>
 
         <h1 className="setup-title">Crear partida online</h1>
-        <p className="setup-subtitle">Tú jugarás con negras. Comparte el código con tu rival cuando la partida esté creada.</p>
+        <p className="setup-subtitle">Comparte el código con tu rival cuando la partida esté creada.</p>
 
         <section className="setup-section">
           <h2>Tamaño del tablero</h2>
@@ -53,6 +57,28 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
             ))}
           </div>
         </section>
+
+        <section className="setup-section">
+          <h2>Tu color</h2>
+          <div className="setup-options">
+            <button
+              className={`setup-option ${creatorColor === "black" ? "setup-option-active" : ""}`}
+              onClick={() => setCreatorColor("black")}
+              disabled={isCreating}
+            >
+              <span className="stone-dot stone-dot-black" /> Negras
+            </button>
+            <button
+              className={`setup-option ${creatorColor === "white" ? "setup-option-active" : ""}`}
+              onClick={() => setCreatorColor("white")}
+              disabled={isCreating}
+            >
+              <span className="stone-dot stone-dot-white" /> Blancas
+            </button>
+          </div>
+        </section>
+
+        <KomiSelector komi={komi} onSelect={setKomi} disabled={isCreating} />
 
         <section className="setup-section">
           <h2>Tu nombre (opcional)</h2>

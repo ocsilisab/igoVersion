@@ -25,10 +25,11 @@ export default withHandler(["POST"], async (req: VercelRequest, res: VercelRespo
   const displayName = sanitizeDisplayName(body.displayName) ?? defaultGuestName(guestId);
   const game = await joinGame({ code, guestId, displayName });
   const color = resolveColor(game, guestId);
+  const seatedName = (color === "black" ? game.blackName : color === "white" ? game.whiteName : null) ?? displayName;
 
   const response: GameResponse = {
     game,
-    you: { guestId, userType: "guest", color, displayName: color === "white" ? displayName : game.blackName },
+    you: { guestId, userType: "guest", color, displayName: seatedName },
   };
   res.status(200).json(response);
 });

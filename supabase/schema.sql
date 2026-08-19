@@ -21,6 +21,8 @@ create table if not exists games (
   version integer not null default 0,
 
   board_size smallint not null,
+  -- Compensation points awarded to White at scoring time (see types/game.ts::KOMI_OPTIONS).
+  komi numeric(4,1) not null default 6.5,
   board jsonb not null,
   current_player text not null check (current_player in ('black', 'white')),
   black_captures integer not null default 0,
@@ -37,9 +39,11 @@ create table if not exists games (
   winner text check (winner in ('black', 'white', 'draw')),
   score jsonb,
 
-  black_player_id text not null,
+  -- Nullable on both sides: the creator picks either color, leaving the other seat
+  -- empty (null) until someone joins — see api/_lib/gameRepo.ts createGame/joinGame.
+  black_player_id text,
   white_player_id text,
-  black_name text not null,
+  black_name text,
   white_name text,
   abandoned_by text check (abandoned_by in ('black', 'white')),
 
@@ -49,6 +53,13 @@ create table if not exists games (
   -- second player can no longer be joined and is treated as expired.
   expires_at timestamptz not null default (now() + interval '20 minutes')
 );
+
+-- Migration for a `games` table created before komi / either-color-creation existed:
+-- adds the missing column and relaxes the two NOT NULL constraints that assumed the
+-- creator was always black. Safe no-ops if already applied.
+alter table games add column if not exists komi numeric(4,1) not null default 6.5;
+alter table games alter column black_player_id drop not null;
+alter table games alter column black_name drop not null;
 
 create unique index if not exists games_code_key on games (code);
 create index if not exists games_status_idx on games (status);

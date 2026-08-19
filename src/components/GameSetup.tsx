@@ -1,9 +1,11 @@
 import { useState } from "react";
 import type { BoardSize, Player } from "../types/game";
+import { DEFAULT_KOMI } from "../types/game";
+import KomiSelector from "./KomiSelector";
 import "./GameSetup.css";
 
 interface GameSetupProps {
-  onStart: (boardSize: BoardSize, playerColor: Player) => void;
+  onStart: (boardSize: BoardSize, playerColor: Player, komi: number) => void;
   onCancel: () => void;
 }
 
@@ -12,6 +14,7 @@ const BOARD_SIZES: BoardSize[] = [9, 13, 19];
 export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
   const [boardSize, setBoardSize] = useState<BoardSize>(9);
   const [playerColor, setPlayerColor] = useState<Player>("black");
+  const [komi, setKomi] = useState<number>(DEFAULT_KOMI);
 
   return (
     <div className="setup-screen">
@@ -57,7 +60,9 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
           {playerColor === "white" && <p className="setup-hint">La IA (Negras) hará el primer movimiento.</p>}
         </section>
 
-        <button className="btn btn-primary setup-start" onClick={() => onStart(boardSize, playerColor)}>
+        <KomiSelector komi={komi} onSelect={setKomi} />
+
+        <button className="btn btn-primary setup-start" onClick={() => onStart(boardSize, playerColor, komi)}>
           Empezar partida
         </button>
       </div>

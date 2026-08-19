@@ -1,4 +1,4 @@
-import type { BoardSize } from "../types/game.js";
+import type { BoardSize, Player } from "../types/game.js";
 import type { ApiErrorBody, GameMutationResponse, GameResponse } from "./types.js";
 
 export class OnlineApiError extends Error {
@@ -30,10 +30,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export function createOnlineGame(boardSize: BoardSize, displayName?: string): Promise<GameResponse> {
+export function createOnlineGame(
+  boardSize: BoardSize,
+  komi: number,
+  creatorColor: Player,
+  displayName?: string
+): Promise<GameResponse> {
   return request<GameResponse>("/api/games", {
     method: "POST",
-    body: JSON.stringify({ boardSize, displayName }),
+    body: JSON.stringify({ boardSize, komi, creatorColor, displayName }),
   });
 }
 

@@ -39,7 +39,13 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
   const scoringPreview = useMemo(() => {
     if (!game || !game.isScoring) return null;
     const { board: cleaned, deadBlack, deadWhite } = removeDeadStones(game.board, new Set(game.deadStones));
-    return calculateScore(cleaned, game.boardSize, game.blackCaptures + deadWhite, game.whiteCaptures + deadBlack);
+    return calculateScore(
+      cleaned,
+      game.boardSize,
+      game.blackCaptures + deadWhite,
+      game.whiteCaptures + deadBlack,
+      game.komi
+    );
   }, [game]);
 
   if (loading) {
@@ -93,10 +99,10 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
           </button>
         </div>
         <p>
-          Tablero: {game.boardSize} × {game.boardSize}
+          Tablero: {game.boardSize} × {game.boardSize} · Komi {game.komi}
         </p>
         <p>
-          Jugador: {game.blackName} · Negras
+          Jugador: {myName ?? you?.displayName} · {colorLabel(myColor)}
         </p>
         <p className="online-waiting">Esperando rival…</p>
         <button className="btn btn-secondary" onClick={() => void handleLeave()}>
@@ -130,7 +136,7 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
         </button>
         <h1 className="game-title">Partida {game.code}</h1>
         <span className="board-size-label">
-          {game.boardSize} × {game.boardSize}
+          {game.boardSize} × {game.boardSize} · Komi {game.komi}
         </span>
       </header>
 
