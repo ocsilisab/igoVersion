@@ -44,10 +44,40 @@
   width: 100%;
   max-width: 640px;
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 16px;
   font-size: 0.85rem;
   color: var(--text-muted);
+}
+
+.online-roster {
+  display: flex;
+  gap: 32px;
+  margin: 8px 0;
+}
+
+.online-roster-team {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 140px;
+}
+
+.online-roster-team h2 {
+  display: flex;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+
+.online-waiting-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
 }
 
 .connection-line {

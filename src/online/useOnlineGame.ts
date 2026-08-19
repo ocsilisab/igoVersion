@@ -1,17 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import type { Player } from "../types/game.js";
 import type { OnlineGame, YouInfo } from "./types.js";
 import { getSupabaseBrowserClient } from "./supabaseClient.js";
-import { OnlineApiError, fetchOnlineGame, sendFinalize, sendLeave, sendMarkDead, sendMove, sendPass } from "./api.js";
+import {
+  OnlineApiError,
+  fetchOnlineGame,
+  sendFinalize,
+  sendLeave,
+  sendMarkDead,
+  sendMove,
+  sendPass,
+  sendStart,
+} from "./api.js";
 
 const POLL_INTERVAL_MS = 4000;
-const PRESENCE_STALE_MS = 12000;
 
 export type ConnectionStatus = "connected" | "reconnecting";
 
 interface PresencePayload {
-  color: Player;
+  guestId: string;
 }
 
 export interface UseOnlineGameResult {
@@ -20,7 +27,8 @@ export interface UseOnlineGameResult {
   loading: boolean;
   loadError: string | null;
   connectionStatus: ConnectionStatus;
-  opponentConnectionStatus: ConnectionStatus;
+  /** guestIds of every player currently connected to this game's Realtime channel — used to show a dot per roster name. */
+  connectedGuestIds: Set<string>;
   actionError: string | null;
   clearActionError: () => void;
   placeStone: (row: number, col: number) => Promise<void>;
@@ -28,13 +36,15 @@ export interface UseOnlineGameResult {
   toggleDeadGroup: (row: number, col: number) => Promise<void>;
   finalize: () => Promise<void>;
   leave: () => Promise<void>;
+  start: () => Promise<void>;
 }
 
 /**
  * Drives one online game: initial load (also the page-reload recovery path — the server
  * resolves "you" from the signed guest cookie, so there's nothing to restore client-side),
  * a Realtime subscription for instant updates, a light polling fallback so the app still
- * works if Realtime isn't configured, and Presence for the opponent's connection dot.
+ * works if Realtime isn't configured, and Presence for a per-player connection dot (up to
+ * 6 players now, so there's no single "opponent" — every roster member gets their own).
  * Every mutation goes through src/online/api.ts, never touching `game` directly — the
  * server's response (or the next refresh) is always what's rendered.
  */
@@ -45,8 +55,7 @@ export function useOnlineGame(gameId: string, initial?: { game: OnlineGame; you:
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connected");
-  const [opponentPresentAt, setOpponentPresentAt] = useState<number | null>(null);
-  const [opponentConnectionStatus, setOpponentConnectionStatus] = useState<ConnectionStatus>("reconnecting");
+  const [connectedGuestIds, setConnectedGuestIds] = useState<Set<string>>(new Set());
   const [isSubscribed, setIsSubscribed] = useState(false);
 
   const youRef = useRef(you);
@@ -98,11 +107,8 @@ export function useOnlineGame(gameId: string, initial?: { game: OnlineGame; you:
       )
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState<PresencePayload>();
-        const myColor = youRef.current?.color;
-        const opponentPresent = Object.values(state).some((entries) =>
-          entries.some((entry) => entry.color && entry.color !== myColor)
-        );
-        setOpponentPresentAt(opponentPresent ? Date.now() : null);
+        const ids = new Set(Object.values(state).flat().map((entry) => entry.guestId));
+        setConnectedGuestIds(ids);
       })
       .subscribe((status) => {
         setConnectionStatus(status === "SUBSCRIBED" ? "connected" : "reconnecting");
@@ -119,21 +125,10 @@ export function useOnlineGame(gameId: string, initial?: { game: OnlineGame; you:
   }, [gameId, refresh]);
 
   useEffect(() => {
-    if (isSubscribed && you?.color && channelRef.current) {
-      void channelRef.current.track({ color: you.color });
+    if (isSubscribed && youRef.current?.guestId && channelRef.current) {
+      void channelRef.current.track({ guestId: youRef.current.guestId });
     }
-  }, [isSubscribed, you?.color]);
-
-  useEffect(() => {
-    const tick = () => {
-      setOpponentConnectionStatus(
-        opponentPresentAt !== null && Date.now() - opponentPresentAt < PRESENCE_STALE_MS ? "connected" : "reconnecting"
-      );
-    };
-    tick();
-    const interval = window.setInterval(tick, 2000);
-    return () => window.clearInterval(interval);
-  }, [opponentPresentAt]);
+  }, [isSubscribed, you?.guestId]);
 
   const runAction = useCallback(
     async (fn: () => Promise<{ game: OnlineGame }>) => {
@@ -186,13 +181,18 @@ export function useOnlineGame(gameId: string, initial?: { game: OnlineGame; you:
     return runAction(() => sendLeave(game.id));
   }, [game, runAction]);
 
+  const start = useCallback(() => {
+    if (!game) return Promise.resolve();
+    return runAction(() => sendStart(game.id));
+  }, [game, runAction]);
+
   return {
     game,
     you,
     loading,
     loadError,
     connectionStatus,
-    opponentConnectionStatus,
+    connectedGuestIds,
     actionError,
     clearActionError: () => setActionError(null),
     placeStone,
@@ -200,5 +200,6 @@ export function useOnlineGame(gameId: string, initial?: { game: OnlineGame; you:
     toggleDeadGroup,
     finalize,
     leave,
+    start,
   };
 }

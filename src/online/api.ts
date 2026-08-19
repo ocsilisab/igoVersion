@@ -78,3 +78,7 @@ export function sendFinalize(id: string): Promise<GameMutationResponse> {
 export function sendLeave(id: string): Promise<GameMutationResponse> {
   return request<GameMutationResponse>(`/api/games/${id}/leave`, { method: "POST" });
 }
+
+export function sendStart(id: string): Promise<GameMutationResponse> {
+  return request<GameMutationResponse>(`/api/games/${id}/start`, { method: "POST" });
+}

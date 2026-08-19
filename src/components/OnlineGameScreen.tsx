@@ -1,5 +1,8 @@
 import { useMemo, useState } from "react";
 import { useOnlineGame } from "../online/useOnlineGame";
+import { activeRoster, getActivePlayer, rosterNames } from "../online/turns";
+import type { OnlinePlayer } from "../online/types";
+import { MAX_TOTAL_PLAYERS } from "../types/game";
 import { calculateScore, removeDeadStones } from "../utils/scoring";
 import GoBoard from "./GoBoard";
 import GameInfo from "./GameInfo";
@@ -13,8 +16,14 @@ interface OnlineGameScreenProps {
   onExit: () => void;
 }
 
-const colorLabel = (color: "black" | "white" | null): string =>
-  color === "black" ? "Negras" : color === "white" ? "Blancas" : "";
+function PlayerDot({ player, connected }: { player: OnlinePlayer; connected: boolean }) {
+  return (
+    <span className={`connection-line connection-${connected ? "connected" : "reconnecting"}`}>
+      {connected ? "●" : "○"} {player.displayName}
+      {player.isCreator && " (host)"}
+    </span>
+  );
+}
 
 export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenProps) {
   const {
@@ -23,7 +32,7 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
     loading,
     loadError,
     connectionStatus,
-    opponentConnectionStatus,
+    connectedGuestIds,
     actionError,
     clearActionError,
     placeStone,
@@ -31,6 +40,7 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
     toggleDeadGroup,
     finalize,
     leave,
+    start,
   } = useOnlineGame(gameId);
 
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -67,11 +77,6 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
     );
   }
 
-  const myColor = you?.color ?? null;
-  const opponentColor = myColor === "black" ? "white" : myColor === "white" ? "black" : null;
-  const opponentName = opponentColor === "black" ? game.blackName : opponentColor === "white" ? game.whiteName : null;
-  const myName = myColor === "black" ? game.blackName : myColor === "white" ? game.whiteName : null;
-
   const handleCopyCode = async () => {
     try {
       await navigator.clipboard.writeText(game.code);
@@ -88,6 +93,12 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
   };
 
   if (game.status === "waiting") {
+    const blackRoster = activeRoster(game, "black");
+    const whiteRoster = activeRoster(game, "white");
+    const totalActive = blackRoster.length + whiteRoster.length;
+    const canStart = you?.isCreator && blackRoster.length > 0 && whiteRoster.length > 0;
+    const isFull = totalActive >= MAX_TOTAL_PLAYERS;
+
     return (
       <div className="online-status-screen">
         <h1 className="game-title">Partida creada</h1>
@@ -101,23 +112,56 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
         <p>
           Tablero: {game.boardSize} × {game.boardSize} · Komi {game.komi}
         </p>
-        <p>
-          Jugador: {myName ?? you?.displayName} · {colorLabel(myColor)}
+
+        <div className="online-roster">
+          <div className="online-roster-team">
+            <h2>
+              <span className="stone-dot stone-dot-black" /> Negras ({blackRoster.length})
+            </h2>
+            {blackRoster.map((p) => (
+              <PlayerDot key={p.guestId} player={p} connected={connectedGuestIds.has(p.guestId)} />
+            ))}
+          </div>
+          <div className="online-roster-team">
+            <h2>
+              <span className="stone-dot stone-dot-white" /> Blancas ({whiteRoster.length})
+            </h2>
+            {whiteRoster.map((p) => (
+              <PlayerDot key={p.guestId} player={p} connected={connectedGuestIds.has(p.guestId)} />
+            ))}
+          </div>
+        </div>
+
+        <p className="online-waiting">
+          {isFull ? "Sala llena (máximo 6 jugadores)." : `Esperando más jugadores… (hasta ${MAX_TOTAL_PLAYERS})`}
         </p>
-        <p className="online-waiting">Esperando rival…</p>
-        <button className="btn btn-secondary" onClick={() => void handleLeave()}>
-          Cancelar partida
-        </button>
+
+        {actionError && <p className="error-banner">{actionError}</p>}
+
+        <div className="online-waiting-actions">
+          {you?.isCreator && (
+            <button className="btn btn-primary" onClick={() => void start()} disabled={!canStart}>
+              Empezar partida
+            </button>
+          )}
+          <button className="btn btn-secondary" onClick={() => void handleLeave()}>
+            {you?.isCreator ? "Cancelar partida" : "Salir"}
+          </button>
+        </div>
       </div>
     );
   }
 
   if (game.status === "abandoned") {
-    const iLeft = game.abandonedBy === myColor;
+    const myTeamAbandoned = game.abandonedTeam === you?.team;
     return (
       <div className="online-status-screen">
         <h1 className="game-title">Partida abandonada</h1>
-        <p>{iLeft ? "Has abandonado la partida." : "El rival se ha desconectado y ha abandonado la partida."}</p>
+        <p>
+          {myTeamAbandoned
+            ? "Tu equipo se ha quedado sin jugadores. Partida abandonada."
+            : "El equipo rival se ha quedado sin jugadores. Partida abandonada."}
+        </p>
         <button className="btn btn-secondary" onClick={onExit}>
           Volver al inicio
         </button>
@@ -125,8 +169,9 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
     );
   }
 
-  const isMyTurn = myColor !== null && game.status === "playing" && !game.isScoring && game.currentPlayer === myColor;
+  const isMyTurn = Boolean(you?.isYourTurn);
   const boardDisabled = game.status !== "playing" || game.isScoring || !isMyTurn;
+  const activePlayer = getActivePlayer(game, game.currentPlayer);
 
   return (
     <div className="game-screen">
@@ -142,13 +187,13 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
 
       <div className="online-players-row">
         <span className={`connection-line connection-${connectionStatus}`}>
-          {connectionStatus === "connected" ? "●" : "○"} Tú: {myName ?? "—"}
-          {myColor && ` (${colorLabel(myColor)})`}
+          {connectionStatus === "connected" ? "●" : "○"} Tú: {you?.displayName}
         </span>
-        <span className={`connection-line connection-${opponentConnectionStatus}`}>
-          {opponentConnectionStatus === "connected" ? "●" : "○"} Rival: {opponentName ?? "esperando…"}
-          {opponentColor && ` (${colorLabel(opponentColor)})`}
-        </span>
+        {game.players
+          .filter((p) => p.active && p.guestId !== you?.guestId)
+          .map((p) => (
+            <PlayerDot key={p.guestId} player={p} connected={connectedGuestIds.has(p.guestId)} />
+          ))}
       </div>
 
       <GameInfo
@@ -159,6 +204,9 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
         gameOver={game.status === "finished"}
         isScoring={game.isScoring}
         scoringPreview={scoringPreview}
+        teamsRoster={rosterNames(game)}
+        activePlayerName={activePlayer?.displayName}
+        alwaysShowRoster
       />
 
       {actionError && (
@@ -195,7 +243,7 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
       {confirmLeave && (
         <ConfirmModal
           title="Abandonar partida"
-          message="¿Seguro que quieres abandonar? El rival será notificado y la partida terminará."
+          message="¿Seguro que quieres abandonar? Si eras el último de tu equipo, la partida terminará para todos."
           onConfirm={() => void handleLeave()}
           onCancel={() => setConfirmLeave(false)}
         />

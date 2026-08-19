@@ -15,6 +15,16 @@ export interface Position {
 export const KOMI_OPTIONS: readonly number[] = [0, 6.5, 7.5];
 export const DEFAULT_KOMI = 6.5;
 
+/** Every mode starts at a plain 1v1 and can grow to team play, up to this many people total. */
+export const MIN_TOTAL_PLAYERS = 2;
+export const MAX_TOTAL_PLAYERS = 6;
+
+/** Each color's roster of player names/labels for the local (solo/AI) team modes. */
+export interface TeamRoster {
+  black: string[];
+  white: string[];
+}
+
 export interface ScoreResult {
   blackStones: number;
   whiteStones: number;
@@ -32,6 +42,9 @@ export interface GameState {
   board: Board;
   boardSize: BoardSize;
   komi: number;
+  teams: TeamRoster;
+  /** Index of the roster member whose turn it is next, per color — advances (mod team size) each time that color moves or passes. */
+  turnIndex: Record<Player, number>;
   currentPlayer: Player;
   blackCaptures: number;
   whiteCaptures: number;

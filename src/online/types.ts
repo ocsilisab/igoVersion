@@ -12,9 +12,22 @@ export const REGISTRATION_ENABLED = false;
 
 export type OnlineGameStatus = "waiting" | "playing" | "finished" | "abandoned";
 
+/** One person in an online game's roster — see supabase/schema.sql::game_players. */
+export interface OnlinePlayer {
+  guestId: string;
+  displayName: string;
+  team: Player;
+  turnOrder: number;
+  isCreator: boolean;
+  /** False once they've left (leave.ts soft-deletes rather than removing the row). */
+  active: boolean;
+}
+
 /**
  * Server-authoritative online game record, as sent to the browser. Mirrors the `games`
- * table (see supabase/schema.sql) in camelCase; the server is the only writer.
+ * table (see supabase/schema.sql) in camelCase, plus its full player roster; the server
+ * is the only writer. A game has 2 to 6 players split across the two colors (teams) —
+ * see src/online/turns.ts for whose turn it specifically is within a team.
  */
 export interface OnlineGame {
   id: string;
@@ -25,6 +38,8 @@ export interface OnlineGame {
   komi: number;
   board: Board;
   currentPlayer: Player;
+  blackTurnIndex: number;
+  whiteTurnIndex: number;
   blackCaptures: number;
   whiteCaptures: number;
   consecutivePasses: number;
@@ -36,12 +51,9 @@ export interface OnlineGame {
   status: OnlineGameStatus;
   winner: Player | "draw" | null;
   score: ScoreResult | null;
+  abandonedTeam: Player | null;
 
-  blackPlayerId: string | null;
-  whitePlayerId: string | null;
-  blackName: string | null;
-  whiteName: string | null;
-  abandonedBy: Player | null;
+  players: OnlinePlayer[];
 
   createdAt: string;
   updatedAt: string;
@@ -51,8 +63,11 @@ export interface OnlineGame {
 export interface YouInfo {
   guestId: string;
   userType: UserType;
-  color: Player | null;
+  team: Player | null;
   displayName: string;
+  isCreator: boolean;
+  /** Whether it's specifically this guest's turn right now (not just their team's). */
+  isYourTurn: boolean;
 }
 
 export interface GameResponse {
@@ -60,7 +75,7 @@ export interface GameResponse {
   you: YouInfo;
 }
 
-/** Returned by move/pass/mark-dead/finalize/leave — the caller's identity doesn't change mid-game. */
+/** Returned by move/pass/mark-dead/finalize/leave/start — the caller's identity doesn't change mid-game. */
 export interface GameMutationResponse {
   game: OnlineGame;
 }

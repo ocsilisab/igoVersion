@@ -1,9 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { GameResponse } from "../../../src/online/types.js";
+import { buildYouInfo } from "../../../src/online/turns.js";
 import { withHandler } from "../../_lib/http.js";
 import { Errors } from "../../_lib/errors.js";
 import { readGuestId } from "../../_lib/session.js";
-import { findGameById, resolveColor } from "../../_lib/gameRepo.js";
+import { findGameById } from "../../_lib/gameRepo.js";
 
 /**
  * Fetches the current authoritative state of a game — used both for the initial load
@@ -18,12 +19,6 @@ export default withHandler(["GET"], async (req: VercelRequest, res: VercelRespon
   if (!game) throw Errors.notFound();
 
   const guestId = readGuestId(req);
-  const color = resolveColor(game, guestId);
-  const displayName = (color === "black" ? game.blackName : color === "white" ? game.whiteName : null) ?? "";
-
-  const response: GameResponse = {
-    game,
-    you: { guestId: guestId ?? "", userType: "guest", color, displayName },
-  };
+  const response: GameResponse = { game, you: buildYouInfo(game, guestId) };
   res.status(200).json(response);
 });

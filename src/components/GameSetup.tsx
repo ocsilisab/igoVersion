@@ -1,20 +1,23 @@
 import { useState } from "react";
 import type { BoardSize, Player } from "../types/game";
-import { DEFAULT_KOMI } from "../types/game";
+import { DEFAULT_KOMI, MAX_TOTAL_PLAYERS } from "../types/game";
 import KomiSelector from "./KomiSelector";
+import PlayerRoster from "./PlayerRoster";
 import "./GameSetup.css";
 
 interface GameSetupProps {
-  onStart: (boardSize: BoardSize, playerColor: Player, komi: number) => void;
+  onStart: (boardSize: BoardSize, playerColor: Player, komi: number, humanNames: string[]) => void;
   onCancel: () => void;
 }
 
 const BOARD_SIZES: BoardSize[] = [9, 13, 19];
+const MAX_HUMAN_PLAYERS = MAX_TOTAL_PLAYERS - 1; // the AI always takes one seat
 
 export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
   const [boardSize, setBoardSize] = useState<BoardSize>(9);
   const [playerColor, setPlayerColor] = useState<Player>("black");
   const [komi, setKomi] = useState<number>(DEFAULT_KOMI);
+  const [humanNames, setHumanNames] = useState<string[]>(["Jugador 1"]);
 
   return (
     <div className="setup-screen">
@@ -42,7 +45,7 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
         </section>
 
         <section className="setup-section">
-          <h2>Tu color</h2>
+          <h2>Tu equipo juega con</h2>
           <div className="setup-options">
             <button
               className={`setup-option ${playerColor === "black" ? "setup-option-active" : ""}`}
@@ -60,9 +63,20 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
           {playerColor === "white" && <p className="setup-hint">La IA (Negras) hará el primer movimiento.</p>}
         </section>
 
+        <PlayerRoster
+          title="Vuestro equipo (mismo dispositivo)"
+          players={humanNames}
+          onChange={setHumanNames}
+          min={1}
+          max={MAX_HUMAN_PLAYERS}
+        />
+
         <KomiSelector komi={komi} onSelect={setKomi} />
 
-        <button className="btn btn-primary setup-start" onClick={() => onStart(boardSize, playerColor, komi)}>
+        <button
+          className="btn btn-primary setup-start"
+          onClick={() => onStart(boardSize, playerColor, komi, humanNames)}
+        >
           Empezar partida
         </button>
       </div>

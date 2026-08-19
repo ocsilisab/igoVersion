@@ -5,7 +5,7 @@ import { withHandler } from "../../_lib/http.js";
 import { checkRateLimit } from "../../_lib/rateLimit.js";
 import { Errors } from "../../_lib/errors.js";
 import { readGuestId } from "../../_lib/session.js";
-import { loadGameForPlayer, applyGameUpdate } from "../../_lib/gameRepo.js";
+import { loadActiveGameForPlayer, applyGameUpdate } from "../../_lib/gameRepo.js";
 
 const PASSES_TO_END_ACTIVE_PLAY = 2;
 
@@ -17,17 +17,16 @@ export default withHandler(["POST"], async (req: VercelRequest, res: VercelRespo
   if (typeof id !== "string") throw Errors.badRequest("Falta el id de la partida.");
 
   const guestId = readGuestId(req);
-  const { game, color } = await loadGameForPlayer(id, guestId);
-
-  if (game.isScoring) throw Errors.invalidMove("La partida está en fase de puntuación.");
-  if (game.currentPlayer !== color) throw Errors.notYourTurn();
+  const { game, team } = await loadActiveGameForPlayer(id, guestId);
 
   const consecutivePasses = game.consecutivePasses + 1;
-  const nextPlayer = opponent(color);
+  const turnField = team === "black" ? "black_turn_index" : "white_turn_index";
+  const currentTurnIndex = team === "black" ? game.blackTurnIndex : game.whiteTurnIndex;
 
   const updated = await applyGameUpdate(game, {
     consecutive_passes: consecutivePasses,
-    current_player: nextPlayer,
+    current_player: opponent(team),
+    [turnField]: currentTurnIndex + 1,
     is_scoring: consecutivePasses >= PASSES_TO_END_ACTIVE_PLAY,
   });
 

@@ -12,22 +12,24 @@ interface AiGameScreenProps {
   boardSize: BoardSize;
   playerColor: Player;
   komi: number;
+  humanNames: string[];
   onExit: () => void;
 }
 
-export default function AiGameScreen({ boardSize, playerColor, komi, onExit }: AiGameScreenProps) {
+export default function AiGameScreen({ boardSize, playerColor, komi, humanNames, onExit }: AiGameScreenProps) {
   const aiColor: Player = playerColor === "black" ? "white" : "black";
   const {
     state,
     lastError,
     isAiThinking,
     scoringPreview,
+    activePlayerName,
     placeStone,
     pass,
     toggleDeadGroup,
     finalizeScoring,
     resetGame,
-  } = useAiGoGame(boardSize, aiColor, komi);
+  } = useAiGoGame(boardSize, aiColor, komi, humanNames);
   const [confirmReset, setConfirmReset] = useState(false);
 
   const isPlayerTurn = !state.gameOver && !state.isScoring && !isAiThinking && state.currentPlayer === playerColor;
@@ -55,11 +57,12 @@ export default function AiGameScreen({ boardSize, playerColor, komi, onExit }: A
         whiteCaptures={state.whiteCaptures}
         consecutivePasses={state.consecutivePasses}
         gameOver={state.gameOver}
-        playerColor={playerColor}
-        aiColor={aiColor}
         isAiThinking={isAiThinking}
         isScoring={state.isScoring}
         scoringPreview={scoringPreview}
+        teamsRoster={state.teams}
+        activePlayerName={activePlayerName}
+        alwaysShowRoster
       />
 
       {lastError && <p className="error-banner">{lastError}</p>}

@@ -1,10 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { GameResponse } from "../../src/online/types.js";
+import { buildYouInfo } from "../../src/online/turns.js";
 import { withHandler, readBody } from "../_lib/http.js";
 import { checkRateLimit } from "../_lib/rateLimit.js";
 import { Errors } from "../_lib/errors.js";
 import { ensureGuestId, sanitizeDisplayName, defaultGuestName } from "../_lib/session.js";
-import { joinGame, resolveColor } from "../_lib/gameRepo.js";
+import { joinGame } from "../_lib/gameRepo.js";
 import { normalizeGameCode, isValidGameCode } from "../_lib/gameCode.js";
 
 interface JoinGameBody {
@@ -12,6 +13,7 @@ interface JoinGameBody {
   displayName?: string;
 }
 
+/** Joins the roster of a `waiting` game — auto-assigned to whichever team is smaller. */
 export default withHandler(["POST"], async (req: VercelRequest, res: VercelResponse) => {
   const allowed = await checkRateLimit(req, { action: "join_game", limit: 20, windowSeconds: 60 });
   if (!allowed) throw Errors.rateLimited();
@@ -24,12 +26,7 @@ export default withHandler(["POST"], async (req: VercelRequest, res: VercelRespo
 
   const displayName = sanitizeDisplayName(body.displayName) ?? defaultGuestName(guestId);
   const game = await joinGame({ code, guestId, displayName });
-  const color = resolveColor(game, guestId);
-  const seatedName = (color === "black" ? game.blackName : color === "white" ? game.whiteName : null) ?? displayName;
 
-  const response: GameResponse = {
-    game,
-    you: { guestId, userType: "guest", color, displayName: seatedName },
-  };
+  const response: GameResponse = { game, you: buildYouInfo(game, guestId) };
   res.status(200).json(response);
 });

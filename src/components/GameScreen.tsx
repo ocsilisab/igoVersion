@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useGoGame } from "../hooks/useGoGame";
-import type { BoardSize } from "../types/game";
+import type { BoardSize, TeamRoster } from "../types/game";
 import GoBoard from "./GoBoard";
 import GameInfo from "./GameInfo";
 import GameControls from "./GameControls";
@@ -11,14 +11,13 @@ import "./GameScreen.css";
 interface GameScreenProps {
   boardSize: BoardSize;
   komi: number;
+  teams: TeamRoster;
   onExit: () => void;
 }
 
-export default function GameScreen({ boardSize, komi, onExit }: GameScreenProps) {
-  const { state, lastError, scoringPreview, placeStone, pass, toggleDeadGroup, finalizeScoring, resetGame } = useGoGame(
-    boardSize,
-    komi
-  );
+export default function GameScreen({ boardSize, komi, teams, onExit }: GameScreenProps) {
+  const { state, lastError, scoringPreview, activePlayerName, placeStone, pass, toggleDeadGroup, finalizeScoring, resetGame } =
+    useGoGame(boardSize, komi, teams);
   const [confirmReset, setConfirmReset] = useState(false);
 
   const confirmResetGame = () => {
@@ -46,6 +45,8 @@ export default function GameScreen({ boardSize, komi, onExit }: GameScreenProps)
         gameOver={state.gameOver}
         isScoring={state.isScoring}
         scoringPreview={scoringPreview}
+        teamsRoster={state.teams}
+        activePlayerName={activePlayerName}
       />
 
       {lastError && <p className="error-banner">{lastError}</p>}

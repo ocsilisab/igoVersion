@@ -102,3 +102,62 @@
   font-size: 1.1rem;
   padding: 16px;
 }
+
+.player-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.player-roster-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-roster-row .setup-input {
+  flex: 1 1 auto;
+}
+
+.player-roster-remove {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.player-roster-remove:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.player-roster-add {
+  width: 100%;
+}
+
+.team-split-preview {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 28px;
+  font-size: 0.9rem;
+}
+
+.team-split-preview p {
+  display: flex;
+  align-items: center;
+  margin: 4px 0;
+  color: var(--text);
+}
+
+.team-split-preview .setup-hint {
+  color: var(--text-muted);
+  margin-top: 8px;
+}

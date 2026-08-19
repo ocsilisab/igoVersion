@@ -40,7 +40,10 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
         </button>
 
         <h1 className="setup-title">Crear partida online</h1>
-        <p className="setup-subtitle">Comparte el código con tu rival cuando la partida esté creada.</p>
+        <p className="setup-subtitle">
+          Comparte el código cuando la partida esté creada. Hasta 6 jugadores pueden unirse y formar equipos —
+          empiezas tú solo en tu color, y decides cuándo arrancar la partida.
+        </p>
 
         <section className="setup-section">
           <h2>Tamaño del tablero</h2>

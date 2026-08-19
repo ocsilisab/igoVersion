@@ -8,7 +8,7 @@ import OnlineSetup from "./components/OnlineSetup";
 import CreateOnlineGame from "./components/CreateOnlineGame";
 import JoinOnlineGame from "./components/JoinOnlineGame";
 import OnlineGameScreen from "./components/OnlineGameScreen";
-import type { BoardSize, Player } from "./types/game";
+import type { BoardSize, Player, TeamRoster } from "./types/game";
 import "./App.css";
 
 type Screen =
@@ -25,12 +25,14 @@ type Screen =
 interface SoloConfig {
   boardSize: BoardSize;
   komi: number;
+  teams: TeamRoster;
 }
 
 interface AiConfig {
   boardSize: BoardSize;
   playerColor: Player;
   komi: number;
+  humanNames: string[];
 }
 
 /**
@@ -89,8 +91,8 @@ export default function App() {
     return (
       <SoloSetup
         onCancel={() => setScreen("home")}
-        onStart={(boardSize, komi) => {
-          setSoloConfig({ boardSize, komi });
+        onStart={(boardSize, komi, teams) => {
+          setSoloConfig({ boardSize, komi, teams });
           setScreen("solo-game");
         }}
       />
@@ -98,15 +100,22 @@ export default function App() {
   }
 
   if (screen === "solo-game" && soloConfig) {
-    return <GameScreen boardSize={soloConfig.boardSize} komi={soloConfig.komi} onExit={() => setScreen("home")} />;
+    return (
+      <GameScreen
+        boardSize={soloConfig.boardSize}
+        komi={soloConfig.komi}
+        teams={soloConfig.teams}
+        onExit={() => setScreen("home")}
+      />
+    );
   }
 
   if (screen === "ai-setup") {
     return (
       <GameSetup
         onCancel={() => setScreen("home")}
-        onStart={(boardSize, playerColor, komi) => {
-          setAiConfig({ boardSize, playerColor, komi });
+        onStart={(boardSize, playerColor, komi, humanNames) => {
+          setAiConfig({ boardSize, playerColor, komi, humanNames });
           setScreen("ai-game");
         }}
       />
@@ -119,6 +128,7 @@ export default function App() {
         boardSize={aiConfig.boardSize}
         playerColor={aiConfig.playerColor}
         komi={aiConfig.komi}
+        humanNames={aiConfig.humanNames}
         onExit={() => setScreen("home")}
       />
     );
