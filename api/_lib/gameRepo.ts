@@ -173,24 +173,20 @@ export async function createGame({
     // game link, or by that seat's own invite link (see joinPendingGame/claimSeatByToken).
     const seatTeams = assignSeatTeams(creatorColor, maxPlayers);
     const teamCounters: Record<Player, number> = { black: 0, white: 0 };
+    // Every row needs the same set of keys — a bulk insert with heterogeneous objects
+    // (some rows having extra keys the others lack) is rejected by PostgREST.
     const seatRows = seatTeams.map((team, index) => {
       const turnOrder = teamCounters[team]++;
-      if (index === 0) {
-        return {
-          game_id: gameRow.id,
-          guest_id: guestId,
-          display_name: displayName,
-          team,
-          turn_order: turnOrder,
-          is_creator: true,
-          joined_at: new Date().toISOString(),
-        };
-      }
+      const isCreatorSeat = index === 0;
       return {
         game_id: gameRow.id,
+        guest_id: isCreatorSeat ? guestId : null,
+        display_name: isCreatorSeat ? displayName : null,
         team,
         turn_order: turnOrder,
-        invite_token: randomBytes(16).toString("hex"),
+        is_creator: isCreatorSeat,
+        joined_at: isCreatorSeat ? new Date().toISOString() : null,
+        invite_token: isCreatorSeat ? null : randomBytes(16).toString("hex"),
       };
     });
 
