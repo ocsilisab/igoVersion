@@ -1,15 +1,16 @@
 import { useCallback, useMemo, useState } from "react";
-import type { BoardSize, GameState, Player, Position, ScoreResult, TeamRoster } from "../types/game";
-import { DEFAULT_KOMI } from "../types/game";
+import type { BoardSize, ExtensionRules, GameState, Player, Position, ScoreResult, TeamRoster } from "../types/game";
+import { DEFAULT_KOMI, NO_EXTENSIONS } from "../types/game";
 import { createEmptyBoard, opponent, serializeBoard } from "../utils/board";
 import { calculateScore, removeDeadStones } from "../utils/scoring";
 import { toggleDeadStoneGroup } from "../utils/deadStones";
 import { activeTeamMember } from "../utils/teams";
 import { tryMove, MOVE_ERROR_MESSAGES } from "../utils/move";
+import { applyHoshiConversion, dropBomb, BOMB_INTERVAL } from "../utils/extensions";
 
 const DEFAULT_TEAMS: TeamRoster = { black: ["Negras"], white: ["Blancas"] };
 
-function createInitialState(size: BoardSize, komi: number, teams: TeamRoster): GameState {
+function createInitialState(size: BoardSize, komi: number, teams: TeamRoster, extensions: ExtensionRules): GameState {
   const board = createEmptyBoard(size);
   return {
     board,
@@ -17,6 +18,9 @@ function createInitialState(size: BoardSize, komi: number, teams: TeamRoster): G
     komi,
     teams,
     turnIndex: { black: 0, white: 0 },
+    extensions,
+    moveCount: 0,
+    lastBomb: null,
     currentPlayer: "black",
     blackCaptures: 0,
     whiteCaptures: 0,
@@ -37,8 +41,15 @@ function advanceTurn(turnIndex: Record<Player, number>, color: Player, teams: Te
   return { ...turnIndex, [color]: (turnIndex[color] + 1) % size };
 }
 
-export function useGoGame(initialSize: BoardSize = 9, initialKomi: number = DEFAULT_KOMI, initialTeams: TeamRoster = DEFAULT_TEAMS) {
-  const [state, setState] = useState<GameState>(() => createInitialState(initialSize, initialKomi, initialTeams));
+export function useGoGame(
+  initialSize: BoardSize = 9,
+  initialKomi: number = DEFAULT_KOMI,
+  initialTeams: TeamRoster = DEFAULT_TEAMS,
+  initialExtensions: ExtensionRules = NO_EXTENSIONS
+) {
+  const [state, setState] = useState<GameState>(() =>
+    createInitialState(initialSize, initialKomi, initialTeams, initialExtensions)
+  );
   const [lastError, setLastError] = useState<string | null>(null);
 
   const placeStone = useCallback((pos: Position) => {
@@ -54,17 +65,36 @@ export function useGoGame(initialSize: BoardSize = 9, initialKomi: number = DEFA
         return prev;
       }
 
+      let nextBoard = result.board;
+      let extraCaptured = 0;
+      if (prev.extensions.stars) {
+        const conversion = applyHoshiConversion(nextBoard, boardSize, pos, currentPlayer);
+        nextBoard = conversion.board;
+        extraCaptured = conversion.extraCaptured;
+      }
+
+      const moveCount = prev.moveCount + 1;
+      let lastBomb = prev.lastBomb;
+      if (prev.extensions.bombs && moveCount % BOMB_INTERVAL === 0) {
+        const bomb = dropBomb(nextBoard, boardSize);
+        nextBoard = bomb.board;
+        lastBomb = { center: bomb.center, affected: bomb.affected };
+      }
+
+      const capturedCount = result.capturedCount + extraCaptured;
       const opponentColor = opponent(currentPlayer);
       return {
         ...prev,
-        board: result.board,
+        board: nextBoard,
         currentPlayer: opponentColor,
         turnIndex: advanceTurn(prev.turnIndex, currentPlayer, prev.teams),
-        blackCaptures: prev.blackCaptures + (currentPlayer === "black" ? result.capturedCount : 0),
-        whiteCaptures: prev.whiteCaptures + (currentPlayer === "white" ? result.capturedCount : 0),
+        blackCaptures: prev.blackCaptures + (currentPlayer === "black" ? capturedCount : 0),
+        whiteCaptures: prev.whiteCaptures + (currentPlayer === "white" ? capturedCount : 0),
         consecutivePasses: 0,
-        history: [...prev.history, result.boardState],
+        history: [...prev.history, serializeBoard(nextBoard)],
         lastMove: pos,
+        moveCount,
+        lastBomb,
       };
     });
   }, []);
@@ -121,7 +151,7 @@ export function useGoGame(initialSize: BoardSize = 9, initialKomi: number = DEFA
 
   const resetGame = useCallback(() => {
     setLastError(null);
-    setState((prev) => createInitialState(prev.boardSize, prev.komi, prev.teams));
+    setState((prev) => createInitialState(prev.boardSize, prev.komi, prev.teams, prev.extensions));
   }, []);
 
   const scoringPreview: ScoreResult | null = useMemo(() => {

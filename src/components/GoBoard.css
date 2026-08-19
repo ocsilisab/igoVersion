@@ -87,3 +87,17 @@
   stroke-linecap: round;
   pointer-events: none;
 }
+
+.bomb-marker {
+  pointer-events: none;
+  fill: none;
+  stroke: var(--danger);
+  stroke-width: 0.6;
+  stroke-dasharray: 1.4 1;
+  opacity: 0.7;
+}
+
+.bomb-marker-center {
+  stroke-width: 1;
+  opacity: 0.9;
+}

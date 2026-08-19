@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useGoGame } from "../hooks/useGoGame";
-import type { BoardSize, TeamRoster } from "../types/game";
+import type { BoardSize, ExtensionRules, TeamRoster } from "../types/game";
+import { NO_EXTENSIONS } from "../types/game";
 import GoBoard from "./GoBoard";
 import GameInfo from "./GameInfo";
 import GameControls from "./GameControls";
@@ -12,12 +13,13 @@ interface GameScreenProps {
   boardSize: BoardSize;
   komi: number;
   teams: TeamRoster;
+  extensions?: ExtensionRules;
   onExit: () => void;
 }
 
-export default function GameScreen({ boardSize, komi, teams, onExit }: GameScreenProps) {
+export default function GameScreen({ boardSize, komi, teams, extensions = NO_EXTENSIONS, onExit }: GameScreenProps) {
   const { state, lastError, scoringPreview, activePlayerName, placeStone, pass, toggleDeadGroup, finalizeScoring, resetGame } =
-    useGoGame(boardSize, komi, teams);
+    useGoGame(boardSize, komi, teams, extensions);
   const [confirmReset, setConfirmReset] = useState(false);
 
   const confirmResetGame = () => {
@@ -50,6 +52,11 @@ export default function GameScreen({ boardSize, komi, teams, onExit }: GameScree
       />
 
       {lastError && <p className="error-banner">{lastError}</p>}
+      {state.lastBomb && !state.gameOver && (
+        <p className="setup-hint">
+          💣 Última bomba en fila {state.lastBomb.center.row + 1}, columna {state.lastBomb.center.col + 1}.
+        </p>
+      )}
 
       <GoBoard
         board={state.board}
@@ -59,6 +66,7 @@ export default function GameScreen({ boardSize, komi, teams, onExit }: GameScree
         disabled={state.gameOver || state.isScoring}
         deadStones={state.isScoring ? state.deadStones : undefined}
         onToggleDead={state.isScoring ? toggleDeadGroup : undefined}
+        lastBomb={state.lastBomb}
       />
 
       <GameControls

@@ -25,6 +25,19 @@ export interface TeamRoster {
   white: string[];
 }
 
+/**
+ * Optional house rules, chosen at setup time. "bombs": every BOMB_INTERVAL moves (see
+ * utils/extensions.ts) a random point is cleared, along with its neighbors. "stars": a
+ * stone played next to an empty hoshi point auto-converts that hoshi into a stone of the
+ * same color too. Currently wired up for solo mode only.
+ */
+export interface ExtensionRules {
+  bombs: boolean;
+  stars: boolean;
+}
+
+export const NO_EXTENSIONS: ExtensionRules = { bombs: false, stars: false };
+
 export interface ScoreResult {
   blackStones: number;
   whiteStones: number;
@@ -45,6 +58,11 @@ export interface GameState {
   teams: TeamRoster;
   /** Index of the roster member whose turn it is next, per color — advances (mod team size) each time that color moves or passes. */
   turnIndex: Record<Player, number>;
+  extensions: ExtensionRules;
+  /** Stone placements played so far (passes don't count) — drives the "bombas" interval. */
+  moveCount: number;
+  /** The most recent bomb drop, if any this game, for the board to show where it hit. */
+  lastBomb: { center: Position; affected: Position[] } | null;
   currentPlayer: Player;
   blackCaptures: number;
   whiteCaptures: number;

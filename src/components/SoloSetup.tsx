@@ -1,14 +1,15 @@
 import { useMemo, useState } from "react";
-import type { BoardSize, TeamRoster } from "../types/game";
-import { DEFAULT_KOMI, MAX_TOTAL_PLAYERS, MIN_TOTAL_PLAYERS } from "../types/game";
+import type { BoardSize, ExtensionRules, TeamRoster } from "../types/game";
+import { DEFAULT_KOMI, MAX_TOTAL_PLAYERS, MIN_TOTAL_PLAYERS, NO_EXTENSIONS } from "../types/game";
 import { splitIntoTeams } from "../utils/teams";
 import KomiSelector from "./KomiSelector";
 import PlayerRoster from "./PlayerRoster";
 import TeamSplitPreview from "./TeamSplitPreview";
+import ExtensionsSelector from "./ExtensionsSelector";
 import "./GameSetup.css";
 
 interface SoloSetupProps {
-  onStart: (boardSize: BoardSize, komi: number, teams: TeamRoster) => void;
+  onStart: (boardSize: BoardSize, komi: number, teams: TeamRoster, extensions: ExtensionRules) => void;
   onCancel: () => void;
 }
 
@@ -18,6 +19,7 @@ export default function SoloSetup({ onStart, onCancel }: SoloSetupProps) {
   const [boardSize, setBoardSize] = useState<BoardSize>(9);
   const [komi, setKomi] = useState<number>(DEFAULT_KOMI);
   const [players, setPlayers] = useState<string[]>(["Negras", "Blancas"]);
+  const [extensions, setExtensions] = useState<ExtensionRules>(NO_EXTENSIONS);
 
   const teams = useMemo(() => splitIntoTeams(players), [players]);
 
@@ -60,7 +62,9 @@ export default function SoloSetup({ onStart, onCancel }: SoloSetupProps) {
 
         <KomiSelector komi={komi} onSelect={setKomi} />
 
-        <button className="btn btn-primary setup-start" onClick={() => onStart(boardSize, komi, teams)}>
+        <ExtensionsSelector extensions={extensions} onChange={setExtensions} />
+
+        <button className="btn btn-primary setup-start" onClick={() => onStart(boardSize, komi, teams, extensions)}>
           Empezar partida
         </button>
       </div>

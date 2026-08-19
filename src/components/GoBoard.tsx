@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import type { Board, BoardSize, Position } from "../types/game";
 import { posKey } from "../utils/board";
+import { getHoshiPositions } from "../utils/hoshi";
 import "./GoBoard.css";
 
 interface GoBoardProps {
@@ -18,35 +19,9 @@ interface GoBoardProps {
    */
   deadStones?: Set<string>;
   onToggleDead?: (pos: Position) => void;
+  /** "Bombas" extension: the most recent bomb drop, shown as a marker over its blast radius. */
+  lastBomb?: { center: Position; affected: Position[] } | null;
 }
-
-const STAR_POINTS: Record<BoardSize, Position[]> = {
-  9: [
-    { row: 2, col: 2 },
-    { row: 2, col: 6 },
-    { row: 6, col: 2 },
-    { row: 6, col: 6 },
-    { row: 4, col: 4 },
-  ],
-  13: [
-    { row: 3, col: 3 },
-    { row: 3, col: 9 },
-    { row: 9, col: 3 },
-    { row: 9, col: 9 },
-    { row: 6, col: 6 },
-  ],
-  19: [
-    { row: 3, col: 3 },
-    { row: 3, col: 9 },
-    { row: 3, col: 15 },
-    { row: 9, col: 3 },
-    { row: 9, col: 9 },
-    { row: 9, col: 15 },
-    { row: 15, col: 3 },
-    { row: 15, col: 9 },
-    { row: 15, col: 15 },
-  ],
-};
 
 const VIEW_SIZE = 100;
 const MARGIN = 6;
@@ -60,11 +35,13 @@ export default function GoBoard({
   overlayText,
   deadStones,
   onToggleDead,
+  lastBomb,
 }: GoBoardProps) {
   const isScoringMode = Boolean(onToggleDead);
   const step = (VIEW_SIZE - MARGIN * 2) / (boardSize - 1);
   const coord = (i: number) => MARGIN + i * step;
-  const starPoints = STAR_POINTS[boardSize] ?? [];
+  const starPoints = getHoshiPositions(boardSize);
+  const bombAffectedKeys = new Set((lastBomb?.affected ?? []).map(posKey));
 
   return (
     <div className="go-board-wrapper">
@@ -94,6 +71,8 @@ export default function GoBoard({
             const isEmpty = stone === null;
             const isLastMove = lastMove?.row === row && lastMove?.col === col;
             const isDead = stone !== null && (deadStones?.has(posKey({ row, col })) ?? false);
+            const isBombCenter = lastBomb?.center.row === row && lastBomb.center.col === col;
+            const isBombAffected = bombAffectedKeys.has(posKey({ row, col }));
             const canPlace = !isScoringMode && !disabled && isEmpty;
             const canToggleDead = isScoringMode && stone !== null;
 
@@ -127,6 +106,14 @@ export default function GoBoard({
                 )}
                 {isLastMove && stone && !isDead && (
                   <circle cx={cx} cy={cy} r={step * 0.16} className="last-move-marker" />
+                )}
+                {isBombAffected && (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={step * (isBombCenter ? 0.46 : 0.3)}
+                    className={`bomb-marker ${isBombCenter ? "bomb-marker-center" : ""}`}
+                  />
                 )}
               </g>
             );

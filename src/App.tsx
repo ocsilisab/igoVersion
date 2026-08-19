@@ -8,7 +8,7 @@ import OnlineSetup from "./components/OnlineSetup";
 import CreateOnlineGame from "./components/CreateOnlineGame";
 import JoinOnlineGame from "./components/JoinOnlineGame";
 import OnlineGameScreen from "./components/OnlineGameScreen";
-import type { BoardSize, Player, TeamRoster } from "./types/game";
+import type { BoardSize, ExtensionRules, Player, TeamRoster } from "./types/game";
 import "./App.css";
 
 type Screen =
@@ -26,6 +26,7 @@ interface SoloConfig {
   boardSize: BoardSize;
   komi: number;
   teams: TeamRoster;
+  extensions: ExtensionRules;
 }
 
 interface AiConfig {
@@ -97,8 +98,8 @@ export default function App() {
     return (
       <SoloSetup
         onCancel={() => setScreen("home")}
-        onStart={(boardSize, komi, teams) => {
-          setSoloConfig({ boardSize, komi, teams });
+        onStart={(boardSize, komi, teams, extensions) => {
+          setSoloConfig({ boardSize, komi, teams, extensions });
           setScreen("solo-game");
         }}
       />
@@ -111,6 +112,7 @@ export default function App() {
         boardSize={soloConfig.boardSize}
         komi={soloConfig.komi}
         teams={soloConfig.teams}
+        extensions={soloConfig.extensions}
         onExit={() => setScreen("home")}
       />
     );
