@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { withHandler } from "../_lib/http";
-import { Errors } from "../_lib/errors";
-import { getEnv } from "../_lib/env";
-import { getSupabaseAdmin } from "../_lib/supabaseAdmin";
+import { withHandler } from "../_lib/http.js";
+import { Errors } from "../_lib/errors.js";
+import { getEnv } from "../_lib/env.js";
+import { getSupabaseAdmin } from "../_lib/supabaseAdmin.js";
 
 const STALE_FINISHED_HOURS = 24;
 

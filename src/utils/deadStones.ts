@@ -1,6 +1,6 @@
-import type { Board, BoardSize, Position } from "../types/game";
-import { posKey } from "./board";
-import { getGroup } from "./liberties";
+import type { Board, BoardSize, Position } from "../types/game.js";
+import { posKey } from "./board.js";
+import { getGroup } from "./liberties.js";
 
 /**
  * Toggles the dead/alive mark for the whole connected group at `pos` (standard Go scoring

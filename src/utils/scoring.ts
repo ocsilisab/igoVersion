@@ -1,5 +1,5 @@
-import type { Board, BoardSize, Player, Position, ScoreResult } from "../types/game";
-import { cloneBoard, getNeighbors, posKey } from "./board";
+import type { Board, BoardSize, Player, Position, ScoreResult } from "../types/game.js";
+import { cloneBoard, getNeighbors, posKey } from "./board.js";
 
 export interface RemoveDeadStonesResult {
   board: Board;

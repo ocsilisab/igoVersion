@@ -1,6 +1,6 @@
-import type { Board, BoardSize, Player, Position } from "../types/game";
-import { cloneBoard, posKey } from "./board";
-import { getGroup } from "./liberties";
+import type { Board, BoardSize, Player, Position } from "../types/game.js";
+import { cloneBoard, posKey } from "./board.js";
+import { getGroup } from "./liberties.js";
 
 export interface CaptureResult {
   board: Board;

@@ -1,6 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getEnv, isProduction } from "./env";
+import { getEnv, isProduction } from "./env.js";
 
 const COOKIE_NAME = "go_guest";
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 180; // 180 days

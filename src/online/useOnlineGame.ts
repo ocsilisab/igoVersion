@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import type { Player } from "../types/game";
-import type { OnlineGame, YouInfo } from "./types";
-import { getSupabaseBrowserClient } from "./supabaseClient";
-import { OnlineApiError, fetchOnlineGame, sendFinalize, sendLeave, sendMarkDead, sendMove, sendPass } from "./api";
+import type { Player } from "../types/game.js";
+import type { OnlineGame, YouInfo } from "./types.js";
+import { getSupabaseBrowserClient } from "./supabaseClient.js";
+import { OnlineApiError, fetchOnlineGame, sendFinalize, sendLeave, sendMarkDead, sendMove, sendPass } from "./api.js";
 
 const POLL_INTERVAL_MS = 4000;
 const PRESENCE_STALE_MS = 12000;

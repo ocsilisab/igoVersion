@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import type { GameResponse } from "../../../src/online/types";
-import { withHandler } from "../../_lib/http";
-import { Errors } from "../../_lib/errors";
-import { readGuestId } from "../../_lib/session";
-import { findGameById, resolveColor } from "../../_lib/gameRepo";
+import type { GameResponse } from "../../../src/online/types.js";
+import { withHandler } from "../../_lib/http.js";
+import { Errors } from "../../_lib/errors.js";
+import { readGuestId } from "../../_lib/session.js";
+import { findGameById, resolveColor } from "../../_lib/gameRepo.js";
 
 /**
  * Fetches the current authoritative state of a game — used both for the initial load

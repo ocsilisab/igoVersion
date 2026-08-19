@@ -1,4 +1,4 @@
-import type { Board, BoardSize, Player, ScoreResult } from "../types/game";
+import type { Board, BoardSize, Player, ScoreResult } from "../types/game.js";
 
 /**
  * Identity kind. Only "guest" is usable today — see REGISTRATION_ENABLED.

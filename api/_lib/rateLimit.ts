@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import type { VercelRequest } from "@vercel/node";
-import { getEnv } from "./env";
-import { getSupabaseAdmin } from "./supabaseAdmin";
+import { getEnv } from "./env.js";
+import { getSupabaseAdmin } from "./supabaseAdmin.js";
 
 function hashIp(ip: string): string {
   return createHmac("sha256", getEnv("AUTH_SECRET")).update(ip).digest("hex");

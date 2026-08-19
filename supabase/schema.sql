@@ -66,7 +66,17 @@ create policy "Public read access" on games
 -- the server the sole source of truth for game state.
 
 -- Realtime: broadcast row changes so both browsers see moves live.
-alter publication supabase_realtime add table games;
+-- (ALTER PUBLICATION ... ADD TABLE has no built-in IF NOT EXISTS, so this is
+-- wrapped to stay re-runnable like the rest of the script.)
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'games'
+  ) then
+    alter publication supabase_realtime add table games;
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- rate_limit_hits

@@ -1,4 +1,4 @@
-import type { OnlineErrorCode } from "../../src/online/types";
+import type { OnlineErrorCode } from "../../src/online/types.js";
 
 export class GameApiError extends Error {
   status: number;

@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { GameApiError } from "./errors";
+import { GameApiError } from "./errors.js";
 
 export function readBody<T>(req: VercelRequest): T {
   const body = req.body as unknown;

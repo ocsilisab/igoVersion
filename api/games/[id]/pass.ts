@@ -1,11 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { opponent } from "../../../src/utils/board";
-import type { GameMutationResponse } from "../../../src/online/types";
-import { withHandler } from "../../_lib/http";
-import { checkRateLimit } from "../../_lib/rateLimit";
-import { Errors } from "../../_lib/errors";
-import { readGuestId } from "../../_lib/session";
-import { loadGameForPlayer, applyGameUpdate } from "../../_lib/gameRepo";
+import { opponent } from "../../../src/utils/board.js";
+import type { GameMutationResponse } from "../../../src/online/types.js";
+import { withHandler } from "../../_lib/http.js";
+import { checkRateLimit } from "../../_lib/rateLimit.js";
+import { Errors } from "../../_lib/errors.js";
+import { readGuestId } from "../../_lib/session.js";
+import { loadGameForPlayer, applyGameUpdate } from "../../_lib/gameRepo.js";
 
 const PASSES_TO_END_ACTIVE_PLAY = 2;
 

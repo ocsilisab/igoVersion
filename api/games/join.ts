@@ -1,11 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import type { GameResponse } from "../../src/online/types";
-import { withHandler, readBody } from "../_lib/http";
-import { checkRateLimit } from "../_lib/rateLimit";
-import { Errors } from "../_lib/errors";
-import { ensureGuestId, sanitizeDisplayName, defaultGuestName } from "../_lib/session";
-import { joinGame, resolveColor } from "../_lib/gameRepo";
-import { normalizeGameCode, isValidGameCode } from "../_lib/gameCode";
+import type { GameResponse } from "../../src/online/types.js";
+import { withHandler, readBody } from "../_lib/http.js";
+import { checkRateLimit } from "../_lib/rateLimit.js";
+import { Errors } from "../_lib/errors.js";
+import { ensureGuestId, sanitizeDisplayName, defaultGuestName } from "../_lib/session.js";
+import { joinGame, resolveColor } from "../_lib/gameRepo.js";
+import { normalizeGameCode, isValidGameCode } from "../_lib/gameCode.js";
 
 interface JoinGameBody {
   code?: string;

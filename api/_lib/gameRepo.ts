@@ -1,9 +1,9 @@
-import type { Board, BoardSize, Player } from "../../src/types/game";
-import { createEmptyBoard, serializeBoard } from "../../src/utils/board";
-import type { OnlineGame, OnlineGameStatus } from "../../src/online/types";
-import { generateGameCode } from "./gameCode";
-import { getSupabaseAdmin } from "./supabaseAdmin";
-import { Errors } from "./errors";
+import type { Board, BoardSize, Player } from "../../src/types/game.js";
+import { createEmptyBoard, serializeBoard } from "../../src/utils/board.js";
+import type { OnlineGame, OnlineGameStatus } from "../../src/online/types.js";
+import { generateGameCode } from "./gameCode.js";
+import { getSupabaseAdmin } from "./supabaseAdmin.js";
+import { Errors } from "./errors.js";
 
 const WAITING_TTL_MINUTES = 20;
 const CREATE_CODE_ATTEMPTS = 5;

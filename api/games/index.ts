@@ -1,11 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import type { BoardSize } from "../../src/types/game";
-import type { GameResponse } from "../../src/online/types";
-import { withHandler, readBody } from "../_lib/http";
-import { checkRateLimit } from "../_lib/rateLimit";
-import { Errors } from "../_lib/errors";
-import { ensureGuestId, sanitizeDisplayName, defaultGuestName } from "../_lib/session";
-import { createGame } from "../_lib/gameRepo";
+import type { BoardSize } from "../../src/types/game.js";
+import type { GameResponse } from "../../src/online/types.js";
+import { withHandler, readBody } from "../_lib/http.js";
+import { checkRateLimit } from "../_lib/rateLimit.js";
+import { Errors } from "../_lib/errors.js";
+import { ensureGuestId, sanitizeDisplayName, defaultGuestName } from "../_lib/session.js";
+import { createGame } from "../_lib/gameRepo.js";
 
 const VALID_SIZES: BoardSize[] = [9, 13, 19];
 

@@ -1,5 +1,5 @@
-import type { Board, BoardSize, Position } from "../types/game";
-import { getNeighbors, posKey } from "./board";
+import type { Board, BoardSize, Position } from "../types/game.js";
+import { getNeighbors, posKey } from "./board.js";
 
 export interface GroupInfo {
   stones: Position[];

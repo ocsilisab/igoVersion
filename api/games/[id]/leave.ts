@@ -1,10 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import type { GameMutationResponse } from "../../../src/online/types";
-import { withHandler } from "../../_lib/http";
-import { checkRateLimit } from "../../_lib/rateLimit";
-import { Errors } from "../../_lib/errors";
-import { readGuestId } from "../../_lib/session";
-import { findGameById, resolveColor, applyGameUpdate } from "../../_lib/gameRepo";
+import type { GameMutationResponse } from "../../../src/online/types.js";
+import { withHandler } from "../../_lib/http.js";
+import { checkRateLimit } from "../../_lib/rateLimit.js";
+import { Errors } from "../../_lib/errors.js";
+import { readGuestId } from "../../_lib/session.js";
+import { findGameById, resolveColor, applyGameUpdate } from "../../_lib/gameRepo.js";
 
 /** Voluntary abandon. Idempotent: leaving an already-finished/abandoned game just returns it as-is. */
 export default withHandler(["POST"], async (req: VercelRequest, res: VercelResponse) => {

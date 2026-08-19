@@ -1,5 +1,5 @@
-import type { BoardSize } from "../types/game";
-import type { ApiErrorBody, GameMutationResponse, GameResponse } from "./types";
+import type { BoardSize } from "../types/game.js";
+import type { ApiErrorBody, GameMutationResponse, GameResponse } from "./types.js";
 
 export class OnlineApiError extends Error {
   code: ApiErrorBody["error"];

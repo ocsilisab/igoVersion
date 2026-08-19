@@ -1,8 +1,8 @@
-import type { Board, BoardSize, Player, Position } from "../types/game";
-import { cloneBoard, opponent, serializeBoard } from "./board";
-import { removeDeadGroups } from "./capture";
-import { getGroup } from "./liberties";
-import { violatesKo } from "./ko";
+import type { Board, BoardSize, Player, Position } from "../types/game.js";
+import { cloneBoard, opponent, serializeBoard } from "./board.js";
+import { removeDeadGroups } from "./capture.js";
+import { getGroup } from "./liberties.js";
+import { violatesKo } from "./ko.js";
 
 export type MoveRejectionReason = "occupied" | "suicide" | "ko";
 

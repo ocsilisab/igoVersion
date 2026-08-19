@@ -1,4 +1,4 @@
-import type { Board, BoardSize, Player, Position, Stone } from "../types/game";
+import type { Board, BoardSize, Player, Position, Stone } from "../types/game.js";
 
 export function createEmptyBoard(size: BoardSize): Board {
   return Array.from({ length: size }, () => Array<Stone>(size).fill(null));

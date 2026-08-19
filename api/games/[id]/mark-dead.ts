@@ -1,11 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { toggleDeadStoneGroup } from "../../../src/utils/deadStones";
-import type { GameMutationResponse } from "../../../src/online/types";
-import { withHandler, readBody } from "../../_lib/http";
-import { checkRateLimit } from "../../_lib/rateLimit";
-import { Errors } from "../../_lib/errors";
-import { readGuestId } from "../../_lib/session";
-import { loadGameForPlayer, applyGameUpdate } from "../../_lib/gameRepo";
+import { toggleDeadStoneGroup } from "../../../src/utils/deadStones.js";
+import type { GameMutationResponse } from "../../../src/online/types.js";
+import { withHandler, readBody } from "../../_lib/http.js";
+import { checkRateLimit } from "../../_lib/rateLimit.js";
+import { Errors } from "../../_lib/errors.js";
+import { readGuestId } from "../../_lib/session.js";
+import { loadGameForPlayer, applyGameUpdate } from "../../_lib/gameRepo.js";
 
 interface MarkDeadBody {
   row?: number;
