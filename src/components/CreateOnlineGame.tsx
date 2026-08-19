@@ -12,8 +12,20 @@ interface CreateOnlineGameProps {
 
 const BOARD_SIZES: BoardSize[] = [9, 13, 19];
 
+interface PlayerCountOption {
+  value: number;
+  label: string;
+}
+
+const PLAYER_COUNT_OPTIONS: PlayerCountOption[] = [
+  { value: 2, label: "1 contra 1" },
+  { value: 4, label: "Hasta 4 (equipos)" },
+  { value: 6, label: "Hasta 6 (equipos)" },
+];
+
 export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGameProps) {
   const [boardSize, setBoardSize] = useState<BoardSize>(9);
+  const [maxPlayers, setMaxPlayers] = useState<number>(2);
   const [creatorColor, setCreatorColor] = useState<Player>("black");
   const [komi, setKomi] = useState<number>(DEFAULT_KOMI);
   const [displayName, setDisplayName] = useState("");
@@ -24,7 +36,13 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
     setIsCreating(true);
     setError(null);
     try {
-      const { game } = await createOnlineGame(boardSize, komi, creatorColor, displayName.trim() || undefined);
+      const { game } = await createOnlineGame(
+        boardSize,
+        maxPlayers,
+        komi,
+        creatorColor,
+        displayName.trim() || undefined
+      );
       onCreated(game.id);
     } catch (err) {
       setError(err instanceof OnlineApiError ? err.message : "No se ha podido crear la partida.");
@@ -41,8 +59,8 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
 
         <h1 className="setup-title">Crear partida online</h1>
         <p className="setup-subtitle">
-          Comparte el código cuando la partida esté creada. Hasta 6 jugadores pueden unirse y formar equipos —
-          empiezas tú solo en tu color, y decides cuándo arrancar la partida.
+          Comparte el código cuando la partida esté creada. Elige cuántos jugadores caben en la sala — la partida se
+          podrá empezar en cuanto haya al menos uno en cada color, sin esperar a llenarla.
         </p>
 
         <section className="setup-section">
@@ -56,6 +74,22 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
                 disabled={isCreating}
               >
                 {size} × {size}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="setup-section">
+          <h2>Número de jugadores</h2>
+          <div className="setup-options">
+            {PLAYER_COUNT_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                className={`setup-option ${maxPlayers === option.value ? "setup-option-active" : ""}`}
+                onClick={() => setMaxPlayers(option.value)}
+                disabled={isCreating}
+              >
+                {option.label}
               </button>
             ))}
           </div>

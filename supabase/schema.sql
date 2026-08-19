@@ -23,6 +23,10 @@ create table if not exists games (
   version integer not null default 0,
 
   board_size smallint not null,
+  -- Total player cap the creator chose at setup (2 to 6) — join.ts rejects joins once
+  -- the active roster reaches this. Independent of team split, which is just balanced
+  -- by count as people join (see gameRepo.ts::joinGame).
+  max_players smallint not null default 2 check (max_players between 2 and 6),
   -- Compensation points awarded to White at scoring time (see types/game.ts::KOMI_OPTIONS).
   komi numeric(4,1) not null default 6.5,
   board jsonb not null,
@@ -66,6 +70,7 @@ alter table games add column if not exists black_turn_index integer not null def
 alter table games add column if not exists white_turn_index integer not null default 0;
 alter table games add column if not exists abandoned_team text check (abandoned_team in ('black', 'white'));
 alter table games add column if not exists komi numeric(4,1) not null default 6.5;
+alter table games add column if not exists max_players smallint not null default 2 check (max_players between 2 and 6);
 
 create unique index if not exists games_code_key on games (code);
 create index if not exists games_status_idx on games (status);

@@ -32,13 +32,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function createOnlineGame(
   boardSize: BoardSize,
+  maxPlayers: number,
   komi: number,
   creatorColor: Player,
   displayName?: string
 ): Promise<GameResponse> {
   return request<GameResponse>("/api/games", {
     method: "POST",
-    body: JSON.stringify({ boardSize, komi, creatorColor, displayName }),
+    body: JSON.stringify({ boardSize, maxPlayers, komi, creatorColor, displayName }),
   });
 }
 

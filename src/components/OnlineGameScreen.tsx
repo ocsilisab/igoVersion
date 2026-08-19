@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useOnlineGame } from "../online/useOnlineGame";
 import { activeRoster, getActivePlayer, rosterNames } from "../online/turns";
 import type { OnlinePlayer } from "../online/types";
-import { MAX_TOTAL_PLAYERS } from "../types/game";
 import { calculateScore, removeDeadStones } from "../utils/scoring";
 import GoBoard from "./GoBoard";
 import GameInfo from "./GameInfo";
@@ -97,7 +96,7 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
     const whiteRoster = activeRoster(game, "white");
     const totalActive = blackRoster.length + whiteRoster.length;
     const canStart = you?.isCreator && blackRoster.length > 0 && whiteRoster.length > 0;
-    const isFull = totalActive >= MAX_TOTAL_PLAYERS;
+    const isFull = totalActive >= game.maxPlayers;
 
     return (
       <div className="online-status-screen">
@@ -133,8 +132,13 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
         </div>
 
         <p className="online-waiting">
-          {isFull ? "Sala llena (máximo 6 jugadores)." : `Esperando más jugadores… (hasta ${MAX_TOTAL_PLAYERS})`}
+          {isFull
+            ? `Sala completa (${totalActive}/${game.maxPlayers}). Ya podéis empezar.`
+            : `Esperando más jugadores… (${totalActive}/${game.maxPlayers})`}
         </p>
+        {canStart && !isFull && (
+          <p className="online-waiting">Ya hay al menos uno en cada color: puedes empezar cuando quieras.</p>
+        )}
 
         {actionError && <p className="error-banner">{actionError}</p>}
 

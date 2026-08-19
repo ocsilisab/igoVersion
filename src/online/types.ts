@@ -35,6 +35,8 @@ export interface OnlineGame {
   version: number;
 
   boardSize: BoardSize;
+  /** Total player cap chosen at creation (2 to 6) — see supabase/schema.sql::games.max_players. */
+  maxPlayers: number;
   komi: number;
   board: Board;
   currentPlayer: Player;

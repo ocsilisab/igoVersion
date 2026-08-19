@@ -1,5 +1,4 @@
 import type { Board, BoardSize, Player } from "../../src/types/game.js";
-import { MAX_TOTAL_PLAYERS } from "../../src/types/game.js";
 import { createEmptyBoard, serializeBoard } from "../../src/utils/board.js";
 import type { OnlineGame, OnlineGameStatus, OnlinePlayer } from "../../src/online/types.js";
 import { getActivePlayer } from "../../src/online/turns.js";
@@ -15,6 +14,7 @@ interface GameRow {
   code: string;
   version: number;
   board_size: number;
+  max_players: number;
   komi: number;
   board: Board;
   current_player: Player;
@@ -60,6 +60,7 @@ function rowToGame(row: GameRow, playerRows: PlayerRow[]): OnlineGame {
     code: row.code,
     version: row.version,
     boardSize: row.board_size as BoardSize,
+    maxPlayers: row.max_players,
     komi: row.komi,
     board: row.board,
     currentPlayer: row.current_player,
@@ -112,6 +113,7 @@ async function findGameByCode(code: string): Promise<OnlineGame | null> {
 
 export interface CreateGameInput {
   boardSize: BoardSize;
+  maxPlayers: number;
   komi: number;
   creatorColor: Player;
   guestId: string;
@@ -120,6 +122,7 @@ export interface CreateGameInput {
 
 export async function createGame({
   boardSize,
+  maxPlayers,
   komi,
   creatorColor,
   guestId,
@@ -136,6 +139,7 @@ export async function createGame({
       .insert({
         code,
         board_size: boardSize,
+        max_players: maxPlayers,
         komi,
         board,
         current_player: "black",
@@ -186,7 +190,7 @@ export async function joinGame({ code, guestId, displayName }: JoinGameInput): P
   if (game.status !== "waiting") throw Errors.full();
 
   const activeCount = game.players.filter((p) => p.active).length;
-  if (activeCount >= MAX_TOTAL_PLAYERS) throw Errors.full();
+  if (activeCount >= game.maxPlayers) throw Errors.full();
 
   // Balance teams as evenly as possible; ties go to black.
   const blackCount = game.players.filter((p) => p.team === "black" && p.active).length;
