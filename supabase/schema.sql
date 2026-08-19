@@ -23,9 +23,9 @@ create table if not exists games (
   version integer not null default 0,
 
   board_size smallint not null,
-  -- Total player cap the creator chose at setup (2 to 6) — join.ts rejects joins once
-  -- the active roster reaches this. Independent of team split, which is just balanced
-  -- by count as people join (see gameRepo.ts::joinGame).
+  -- Total seats the creator chose at setup (2 to 6) — exactly this many game_players
+  -- rows get pre-created (see gameRepo.ts::createGame), each with its team already
+  -- decided so the setup screen's team-split preview always matches reality.
   max_players smallint not null default 2 check (max_players between 2 and 6),
   -- Compensation points awarded to White at scoring time (see types/game.ts::KOMI_OPTIONS).
   komi numeric(4,1) not null default 6.5,
@@ -103,40 +103,59 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- game_players
 -- ---------------------------------------------------------------------------
--- One row per person who has ever joined a game (2 to 6 per game): which team
--- (color) they're on, their rotation position within that team, and whether
--- they've left (soft-deleted via left_at rather than removed, so turn rotation
--- and the roster shown to other players stay stable/auditable). The client never
--- writes here directly — every mutation goes through api/_lib/gameRepo.ts, which
--- also touches the parent `games` row so Realtime (subscribed to `games` only)
--- fires and everyone refetches the full roster along with the board.
+-- One row per seat in a game (exactly max_players per game — see games above): which
+-- team (color) it's on, its rotation position within that team, and whether it's still
+-- pending, claimed, or claimed-then-left (see the block comment below for the pending
+-- lifecycle; "left" is soft-deleted via left_at rather than removed, so turn rotation
+-- and the roster shown to other players stay stable/auditable). The client never writes
+-- here directly — every mutation goes through api/_lib/gameRepo.ts, which also touches
+-- the parent `games` row so Realtime (subscribed to `games` only) fires and everyone
+-- refetches the full roster along with the board.
 
+-- All maxPlayers seats are created up front (see gameRepo.ts::createGame), each with its
+-- team already decided (assignSeatTeams). A seat starts "pending" — guest_id/display_name/
+-- joined_at all null, invite_token set — until someone claims it (by code, by the generic
+-- game link, or by that seat's own invite link), at which point those three columns get
+-- filled in and the token becomes irrelevant (claiming again is blocked by `guest_id is null`).
 create table if not exists game_players (
   id bigint generated always as identity primary key,
   game_id uuid not null references games(id) on delete cascade,
-  guest_id text not null,
-  display_name text not null,
+  guest_id text,
+  display_name text,
   team text not null check (team in ('black', 'white')),
   -- Join order within the team (0-based) — determines turn rotation order.
   turn_order integer not null,
   -- The player who created the game; only they can start it once ≥1 person has
   -- joined each team.
   is_creator boolean not null default false,
-  joined_at timestamptz not null default now(),
-  left_at timestamptz
+  joined_at timestamptz,
+  left_at timestamptz,
+  -- Secret used to claim this specific pending seat (its own invite link). Null once
+  -- irrelevant isn't required — claiming is guarded by `guest_id is null`, not by this.
+  invite_token text
 );
 
 create index if not exists game_players_game_idx on game_players (game_id);
 create unique index if not exists game_players_unique_guest on game_players (game_id, guest_id);
+create unique index if not exists game_players_invite_token_key on game_players (invite_token);
+
+-- Migration for a `game_players` table created before invite links existed. Safe no-ops
+-- if already applied.
+alter table game_players alter column guest_id drop not null;
+alter table game_players alter column display_name drop not null;
+alter table game_players alter column joined_at drop not null;
+alter table game_players alter column joined_at drop default;
+alter table game_players add column if not exists invite_token text;
 
 alter table game_players enable row level security;
 
+-- No select/insert/update/delete policy for anon/authenticated: this table now also
+-- holds invite_token secrets, and the client never queries it directly anyway — every
+-- read goes through /api (service role), which decides what to expose (an invite token
+-- only ever goes to that game's creator — see turns.ts::buildGameResponse). Previously
+-- had a public-read policy; removed once invite_token was added, since RLS can't easily
+-- exclude just one column from a SELECT.
 drop policy if exists "Public read access" on game_players;
-create policy "Public read access" on game_players
-  for select
-  using (true);
-
--- No insert/update/delete policy: only the service role writes here, same as games.
 
 -- ---------------------------------------------------------------------------
 -- rate_limit_hits

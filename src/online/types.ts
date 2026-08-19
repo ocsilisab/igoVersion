@@ -24,6 +24,19 @@ export interface OnlinePlayer {
 }
 
 /**
+ * A seat reserved at creation time but not yet claimed by anyone — see
+ * assignSeatTeams (src/online/teamAssignment.ts) for how its team was pre-decided, and
+ * gameRepo.ts::claimSeatByToken for how a specific person fills it. `inviteToken` is a
+ * secret: the server only includes it in responses sent to the game's creator (see
+ * turns.ts::buildGameResponse), since it's the direct-join link for this seat.
+ */
+export interface PendingSeat {
+  team: Player;
+  turnOrder: number;
+  inviteToken?: string;
+}
+
+/**
  * Server-authoritative online game record, as sent to the browser. Mirrors the `games`
  * table (see supabase/schema.sql) in camelCase, plus its full player roster; the server
  * is the only writer. A game has 2 to 6 players split across the two colors (teams) —
@@ -56,6 +69,8 @@ export interface OnlineGame {
   abandonedTeam: Player | null;
 
   players: OnlinePlayer[];
+  /** Reserved seats nobody has claimed yet — always `maxPlayers - players.length` of them. */
+  pendingSeats: PendingSeat[];
 
   createdAt: string;
   updatedAt: string;
@@ -87,6 +102,7 @@ export type OnlineErrorCode =
   | "full"
   | "expired"
   | "invalid_code"
+  | "invalid_invite"
   | "not_your_turn"
   | "wrong_color"
   | "invalid_move"

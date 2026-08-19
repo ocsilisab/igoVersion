@@ -1,7 +1,9 @@
+import { randomBytes } from "node:crypto";
 import type { Board, BoardSize, Player } from "../../src/types/game.js";
 import { createEmptyBoard, serializeBoard } from "../../src/utils/board.js";
-import type { OnlineGame, OnlineGameStatus, OnlinePlayer } from "../../src/online/types.js";
+import type { OnlineGame, OnlineGameStatus, OnlinePlayer, PendingSeat } from "../../src/online/types.js";
 import { getActivePlayer } from "../../src/online/turns.js";
+import { assignSeatTeams } from "../../src/online/teamAssignment.js";
 import { generateGameCode } from "./gameCode.js";
 import { getSupabaseAdmin } from "./supabaseAdmin.js";
 import { Errors } from "./errors.js";
@@ -37,23 +39,30 @@ interface GameRow {
 }
 
 interface PlayerRow {
-  guest_id: string;
-  display_name: string;
+  guest_id: string | null;
+  display_name: string | null;
   team: Player;
   turn_order: number;
   is_creator: boolean;
   left_at: string | null;
+  invite_token: string | null;
 }
 
 function rowToGame(row: GameRow, playerRows: PlayerRow[]): OnlineGame {
-  const players: OnlinePlayer[] = playerRows.map((p) => ({
-    guestId: p.guest_id,
-    displayName: p.display_name,
-    team: p.team,
-    turnOrder: p.turn_order,
-    isCreator: p.is_creator,
-    active: p.left_at === null,
-  }));
+  const players: OnlinePlayer[] = playerRows
+    .filter((p) => p.guest_id !== null)
+    .map((p) => ({
+      guestId: p.guest_id as string,
+      displayName: p.display_name ?? "",
+      team: p.team,
+      turnOrder: p.turn_order,
+      isCreator: p.is_creator,
+      active: p.left_at === null,
+    }));
+
+  const pendingSeats: PendingSeat[] = playerRows
+    .filter((p) => p.guest_id === null)
+    .map((p) => ({ team: p.team, turnOrder: p.turn_order, inviteToken: p.invite_token ?? undefined }));
 
   return {
     id: row.id,
@@ -78,6 +87,7 @@ function rowToGame(row: GameRow, playerRows: PlayerRow[]): OnlineGame {
     score: row.score,
     abandonedTeam: row.abandoned_team,
     players,
+    pendingSeats,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     expiresAt: row.expires_at,
@@ -156,14 +166,35 @@ export async function createGame({
     }
 
     const gameRow = data as GameRow;
-    const { error: playerError } = await supabase.from("game_players").insert({
-      game_id: gameRow.id,
-      guest_id: guestId,
-      display_name: displayName,
-      team: creatorColor,
-      turn_order: 0,
-      is_creator: true,
+
+    // Pre-create every seat (not just the creator's) so the team split shown at setup
+    // time is exactly what gets built — see assignSeatTeams. Seats past the first are
+    // "pending" (no guest_id yet) until someone claims one, by code, by the generic
+    // game link, or by that seat's own invite link (see joinPendingGame/claimSeatByToken).
+    const seatTeams = assignSeatTeams(creatorColor, maxPlayers);
+    const teamCounters: Record<Player, number> = { black: 0, white: 0 };
+    const seatRows = seatTeams.map((team, index) => {
+      const turnOrder = teamCounters[team]++;
+      if (index === 0) {
+        return {
+          game_id: gameRow.id,
+          guest_id: guestId,
+          display_name: displayName,
+          team,
+          turn_order: turnOrder,
+          is_creator: true,
+          joined_at: new Date().toISOString(),
+        };
+      }
+      return {
+        game_id: gameRow.id,
+        team,
+        turn_order: turnOrder,
+        invite_token: randomBytes(16).toString("hex"),
+      };
     });
+
+    const { error: playerError } = await supabase.from("game_players").insert(seatRows);
     if (playerError) throw Errors.serverError();
 
     return rowToGame(gameRow, await fetchPlayers(gameRow.id));
@@ -178,10 +209,28 @@ export interface JoinGameInput {
   displayName: string;
 }
 
-export async function joinGame({ code, guestId, displayName }: JoinGameInput): Promise<OnlineGame> {
-  const game = await findGameByCode(code);
-  if (!game) throw Errors.notFound();
+/**
+ * Atomically claims one specific pending seat: the `guest_id is null` guard means only
+ * one of two concurrent claimants can ever win the update, so callers can safely try
+ * candidate seats in order without a transaction.
+ */
+async function tryClaimSeat(gameId: string, seat: PendingSeat, guestId: string, displayName: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("game_players")
+    .update({ guest_id: guestId, display_name: displayName, joined_at: new Date().toISOString() })
+    .eq("game_id", gameId)
+    .eq("team", seat.team)
+    .eq("turn_order", seat.turnOrder)
+    .is("guest_id", null)
+    .select("id")
+    .maybeSingle();
+  if (error) throw Errors.serverError();
+  return Boolean(data);
+}
 
+/** Shared by code-join and generic-link-join: claims whichever pending seat keeps the teams most balanced. */
+async function joinPendingGame(game: OnlineGame, guestId: string, displayName: string): Promise<OnlineGame> {
   // Idempotent rejoin: reloading the page while still waiting, or right after joining.
   const existing = game.players.find((p) => p.guestId === guestId);
   if (existing) return game;
@@ -189,28 +238,65 @@ export async function joinGame({ code, guestId, displayName }: JoinGameInput): P
   if (isExpiredWaitingGame(game)) throw Errors.expired();
   if (game.status !== "waiting") throw Errors.full();
 
-  const activeCount = game.players.filter((p) => p.active).length;
-  if (activeCount >= game.maxPlayers) throw Errors.full();
-
-  // Balance teams as evenly as possible; ties go to black.
   const blackCount = game.players.filter((p) => p.team === "black" && p.active).length;
   const whiteCount = game.players.filter((p) => p.team === "white" && p.active).length;
-  const team: Player = blackCount <= whiteCount ? "black" : "white";
-  const turnOrder = game.players.filter((p) => p.team === team).length;
+  const preferredTeam: Player = blackCount <= whiteCount ? "black" : "white";
+  const candidates = [
+    ...game.pendingSeats.filter((s) => s.team === preferredTeam).sort((a, b) => a.turnOrder - b.turnOrder),
+    ...game.pendingSeats.filter((s) => s.team !== preferredTeam).sort((a, b) => a.turnOrder - b.turnOrder),
+  ];
+  if (candidates.length === 0) throw Errors.full();
 
+  for (const seat of candidates) {
+    if (await tryClaimSeat(game.id, seat, guestId, displayName)) {
+      // Touch the parent `games` row so everyone's Realtime subscription (on `games`
+      // only — see supabase/schema.sql) fires and they refetch the updated roster.
+      return applyGameUpdate(game, {});
+    }
+  }
+  // Every candidate got claimed by someone else between our read and our writes.
+  throw Errors.full();
+}
+
+export async function joinGame({ code, guestId, displayName }: JoinGameInput): Promise<OnlineGame> {
+  const game = await findGameByCode(code);
+  if (!game) throw Errors.notFound();
+  return joinPendingGame(game, guestId, displayName);
+}
+
+/** The generic per-game link (`?game=<id>`, no invite token): same balancing as a code-join. */
+export async function joinGameById(id: string, guestId: string, displayName: string): Promise<OnlineGame> {
+  const game = await findGameById(id);
+  if (!game) throw Errors.notFound();
+  return joinPendingGame(game, guestId, displayName);
+}
+
+/** A specific player's personal invite link (`?game=<id>&token=<token>`): claims exactly that seat/team. */
+export async function claimSeatByToken(token: string, guestId: string, displayName: string): Promise<OnlineGame> {
   const supabase = getSupabaseAdmin();
-  const { error } = await supabase.from("game_players").insert({
-    game_id: game.id,
-    guest_id: guestId,
-    display_name: displayName,
-    team,
-    turn_order: turnOrder,
-    is_creator: false,
-  });
+  const { data: seatRow, error } = await supabase
+    .from("game_players")
+    .select("game_id, team, turn_order")
+    .eq("invite_token", token)
+    .is("guest_id", null)
+    .maybeSingle();
   if (error) throw Errors.serverError();
+  if (!seatRow) throw Errors.invalidInvite();
 
-  // Touch the parent `games` row so everyone's Realtime subscription (on `games`
-  // only — see supabase/schema.sql) fires and they refetch the updated roster.
+  const gameId = seatRow.game_id as string;
+  const game = await findGameById(gameId);
+  if (!game) throw Errors.notFound();
+
+  const existing = game.players.find((p) => p.guestId === guestId);
+  if (existing) return game;
+
+  if (isExpiredWaitingGame(game)) throw Errors.expired();
+  if (game.status !== "waiting") throw Errors.full();
+
+  const seat: PendingSeat = { team: seatRow.team as Player, turnOrder: seatRow.turn_order as number };
+  const claimed = await tryClaimSeat(gameId, seat, guestId, displayName);
+  if (!claimed) throw Errors.invalidInvite(); // someone else claimed it a moment ago
+
   return applyGameUpdate(game, {});
 }
 

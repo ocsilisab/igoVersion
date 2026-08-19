@@ -5,6 +5,8 @@ import { getSupabaseBrowserClient } from "./supabaseClient.js";
 import {
   OnlineApiError,
   fetchOnlineGame,
+  joinOnlineGameById,
+  joinOnlineGameByToken,
   sendFinalize,
   sendLeave,
   sendMarkDead,
@@ -37,6 +39,8 @@ export interface UseOnlineGameResult {
   finalize: () => Promise<void>;
   leave: () => Promise<void>;
   start: () => Promise<void>;
+  /** Joins the game as a spectator-turned-player: via a specific seat's `token`, or (omitted) the generic game link. */
+  join: (opts?: { token?: string; displayName?: string }) => Promise<void>;
 }
 
 /**
@@ -186,6 +190,25 @@ export function useOnlineGame(gameId: string, initial?: { game: OnlineGame; you:
     return runAction(() => sendStart(game.id));
   }, [game, runAction]);
 
+  // Unlike the other actions, joining changes *who you are* (guestId's team, isYourTurn),
+  // not just the game — so it updates `you` too, instead of going through `runAction`.
+  const join = useCallback(
+    async (opts: { token?: string; displayName?: string } = {}) => {
+      if (!game) return;
+      setActionError(null);
+      try {
+        const res = opts.token
+          ? await joinOnlineGameByToken(opts.token, opts.displayName)
+          : await joinOnlineGameById(game.id, opts.displayName);
+        setGame(res.game);
+        setYou(res.you);
+      } catch (err) {
+        setActionError(err instanceof OnlineApiError ? err.message : "No se ha podido unir a la partida.");
+      }
+    },
+    [game]
+  );
+
   return {
     game,
     you,
@@ -201,5 +224,6 @@ export function useOnlineGame(gameId: string, initial?: { game: OnlineGame; you:
     finalize,
     leave,
     start,
+    join,
   };
 }

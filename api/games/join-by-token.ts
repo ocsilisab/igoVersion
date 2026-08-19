@@ -4,27 +4,26 @@ import { withHandler, readBody } from "../_lib/http.js";
 import { checkRateLimit } from "../_lib/rateLimit.js";
 import { Errors } from "../_lib/errors.js";
 import { ensureGuestId, sanitizeDisplayName, defaultGuestName } from "../_lib/session.js";
-import { joinGame } from "../_lib/gameRepo.js";
-import { normalizeGameCode, isValidGameCode } from "../_lib/gameCode.js";
+import { claimSeatByToken } from "../_lib/gameRepo.js";
 
-interface JoinGameBody {
-  code?: string;
+interface JoinByTokenBody {
+  token?: string;
   displayName?: string;
 }
 
-/** Joins the roster of a `waiting` game — auto-assigned to whichever team is smaller. */
+/** A specific player's personal invite link (`?game=<id>&token=<token>`): claims exactly that seat/team. */
 export default withHandler(["POST"], async (req: VercelRequest, res: VercelResponse) => {
   const allowed = await checkRateLimit(req, { action: "join_game", limit: 20, windowSeconds: 60 });
   if (!allowed) throw Errors.rateLimited();
 
+  const body = readBody<JoinByTokenBody>(req);
+  if (typeof body.token !== "string" || body.token.length === 0) {
+    throw Errors.badRequest("Enlace de invitación no válido.");
+  }
+
   const guestId = ensureGuestId(req, res);
-  const body = readBody<JoinGameBody>(req);
-  const code = normalizeGameCode(body.code ?? "");
-
-  if (!isValidGameCode(code)) throw Errors.invalidCode();
-
   const displayName = sanitizeDisplayName(body.displayName) ?? defaultGuestName(guestId);
-  const game = await joinGame({ code, guestId, displayName });
+  const game = await claimSeatByToken(body.token, guestId, displayName);
 
   res.status(200).json(buildGameResponse(game, guestId));
 });

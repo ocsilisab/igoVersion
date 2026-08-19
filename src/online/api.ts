@@ -50,6 +50,22 @@ export function joinOnlineGame(code: string, displayName?: string): Promise<Game
   });
 }
 
+/** The generic per-game link (`?game=<id>`, no invite token). */
+export function joinOnlineGameById(id: string, displayName?: string): Promise<GameResponse> {
+  return request<GameResponse>(`/api/games/${id}/join`, {
+    method: "POST",
+    body: JSON.stringify({ displayName }),
+  });
+}
+
+/** A specific player's personal invite link (`?game=<id>&token=<token>`). */
+export function joinOnlineGameByToken(token: string, displayName?: string): Promise<GameResponse> {
+  return request<GameResponse>("/api/games/join-by-token", {
+    method: "POST",
+    body: JSON.stringify({ token, displayName }),
+  });
+}
+
 export function fetchOnlineGame(id: string): Promise<GameResponse> {
   return request<GameResponse>(`/api/games/${id}`);
 }

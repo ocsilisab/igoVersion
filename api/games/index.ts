@@ -1,8 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { BoardSize, Player } from "../../src/types/game.js";
 import { KOMI_OPTIONS, MIN_TOTAL_PLAYERS, MAX_TOTAL_PLAYERS } from "../../src/types/game.js";
-import type { GameResponse } from "../../src/online/types.js";
-import { buildYouInfo } from "../../src/online/turns.js";
+import { buildGameResponse } from "../../src/online/turns.js";
 import { withHandler, readBody } from "../_lib/http.js";
 import { checkRateLimit } from "../_lib/rateLimit.js";
 import { Errors } from "../_lib/errors.js";
@@ -54,6 +53,5 @@ export default withHandler(["POST"], async (req: VercelRequest, res: VercelRespo
     displayName,
   });
 
-  const response: GameResponse = { game, you: buildYouInfo(game, guestId) };
-  res.status(201).json(response);
+  res.status(201).json(buildGameResponse(game, guestId));
 });

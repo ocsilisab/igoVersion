@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import type { GameMutationResponse } from "../../../src/online/types.js";
+import { buildMutationResponse } from "../../../src/online/turns.js";
 import { withHandler } from "../../_lib/http.js";
 import { checkRateLimit } from "../../_lib/rateLimit.js";
 import { Errors } from "../../_lib/errors.js";
@@ -22,6 +22,5 @@ export default withHandler(["POST"], async (req: VercelRequest, res: VercelRespo
   const guestId = readGuestId(req);
   const updated = await leaveGame(id, guestId);
 
-  const response: GameMutationResponse = { game: updated };
-  res.status(200).json(response);
+  res.status(200).json(buildMutationResponse(updated, guestId));
 });

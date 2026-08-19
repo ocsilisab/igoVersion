@@ -34,7 +34,9 @@ export default function JoinOnlineGame({ onCancel, onJoined }: JoinOnlineGamePro
         </button>
 
         <h1 className="setup-title">Unirse a partida</h1>
-        <p className="setup-subtitle">Tú jugarás con blancas. Introduce el código que te ha compartido tu rival.</p>
+        <p className="setup-subtitle">
+          Se te asignará el equipo con menos jugadores. Introduce el código que te han compartido.
+        </p>
 
         <section className="setup-section">
           <h2>Código de partida</h2>

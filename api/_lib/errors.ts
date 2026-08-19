@@ -23,6 +23,7 @@ export const Errors = {
   conflict: () => new GameApiError(409, "conflict", "La partida cambió mientras se procesaba tu jugada. Inténtalo de nuevo."),
   rateLimited: () => new GameApiError(429, "rate_limited", "Demasiadas peticiones. Espera un momento."),
   unauthorized: () => new GameApiError(401, "unauthorized", "Sesión de invitado no válida."),
+  invalidInvite: () => new GameApiError(410, "invalid_invite", "Este enlace de invitación ya no es válido."),
   badRequest: (message: string) => new GameApiError(400, "bad_request", message),
   serverError: () => new GameApiError(500, "server_error", "Error interno del servidor."),
 };

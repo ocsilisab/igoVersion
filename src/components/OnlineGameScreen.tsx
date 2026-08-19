@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useOnlineGame } from "../online/useOnlineGame";
 import { activeRoster, getActivePlayer, rosterNames } from "../online/turns";
-import type { OnlinePlayer } from "../online/types";
+import type { OnlinePlayer, PendingSeat } from "../online/types";
 import { calculateScore, removeDeadStones } from "../utils/scoring";
 import GoBoard from "./GoBoard";
 import GameInfo from "./GameInfo";
@@ -12,7 +12,13 @@ import "./OnlineGameScreen.css";
 
 interface OnlineGameScreenProps {
   gameId: string;
+  /** Present when this tab was opened from a specific seat's personal invite link. */
+  inviteToken?: string | null;
   onExit: () => void;
+}
+
+function gameUrl(gameId: string): string {
+  return `${window.location.origin}${window.location.pathname}?game=${gameId}`;
 }
 
 function PlayerDot({ player, connected }: { player: OnlinePlayer; connected: boolean }) {
@@ -24,7 +30,28 @@ function PlayerDot({ player, connected }: { player: OnlinePlayer; connected: boo
   );
 }
 
-export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenProps) {
+function PendingSeatRow({
+  seat,
+  onCopy,
+  copied,
+}: {
+  seat: PendingSeat;
+  onCopy: (token: string) => void;
+  copied: boolean;
+}) {
+  return (
+    <span className="connection-line pending-seat">
+      ○ Plaza vacante
+      {seat.inviteToken && (
+        <button type="button" className="link-button invite-copy" onClick={() => onCopy(seat.inviteToken!)}>
+          {copied ? "¡Copiado!" : "Copiar enlace"}
+        </button>
+      )}
+    </span>
+  );
+}
+
+export default function OnlineGameScreen({ gameId, inviteToken, onExit }: OnlineGameScreenProps) {
   const {
     game,
     you,
@@ -40,10 +67,27 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
     finalize,
     leave,
     start,
+    join,
   } = useOnlineGame(gameId);
 
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedSeatToken, setCopiedSeatToken] = useState<string | null>(null);
+  const [joinName, setJoinName] = useState("");
+  const [isJoining, setIsJoining] = useState(false);
+  const autoJoinAttempted = useRef(false);
+
+  // A personal invite link: claim that seat automatically, then drop the token from the
+  // URL so a refresh doesn't try (harmlessly, but pointlessly) to reclaim it.
+  useEffect(() => {
+    if (!inviteToken || !game || !you || autoJoinAttempted.current) return;
+    if (you.team !== null || game.status !== "waiting") return;
+    autoJoinAttempted.current = true;
+    void join({ token: inviteToken }).then(() => {
+      window.history.replaceState(null, "", `?game=${gameId}`);
+    });
+  }, [inviteToken, game, you, join, gameId]);
 
   const scoringPreview = useMemo(() => {
     if (!game || !game.isScoring) return null;
@@ -86,17 +130,46 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
     }
   };
 
+  const handleCopyGameLink = async () => {
+    try {
+      await navigator.clipboard.writeText(gameUrl(game.id));
+      setCopiedLink(true);
+      window.setTimeout(() => setCopiedLink(false), 1500);
+    } catch {
+      // Clipboard permission denied/unavailable.
+    }
+  };
+
+  const handleCopySeatInvite = async (token: string) => {
+    try {
+      await navigator.clipboard.writeText(`${gameUrl(game.id)}&token=${token}`);
+      setCopiedSeatToken(token);
+      window.setTimeout(() => setCopiedSeatToken((t) => (t === token ? null : t)), 1500);
+    } catch {
+      // Clipboard permission denied/unavailable.
+    }
+  };
+
   const handleLeave = async () => {
     setConfirmLeave(false);
     await leave();
   };
 
+  const handleJoin = async () => {
+    setIsJoining(true);
+    await join({ displayName: joinName.trim() || undefined });
+    setIsJoining(false);
+  };
+
   if (game.status === "waiting") {
     const blackRoster = activeRoster(game, "black");
     const whiteRoster = activeRoster(game, "white");
+    const blackPending = game.pendingSeats.filter((s) => s.team === "black").sort((a, b) => a.turnOrder - b.turnOrder);
+    const whitePending = game.pendingSeats.filter((s) => s.team === "white").sort((a, b) => a.turnOrder - b.turnOrder);
     const totalActive = blackRoster.length + whiteRoster.length;
     const canStart = you?.isCreator && blackRoster.length > 0 && whiteRoster.length > 0;
-    const isFull = totalActive >= game.maxPlayers;
+    const isFull = game.pendingSeats.length === 0;
+    const isMember = Boolean(you?.team);
 
     return (
       <div className="online-status-screen">
@@ -104,9 +177,14 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
         <div className="online-code-card">
           <span className="online-code-label">Código</span>
           <span className="online-code-value">{game.code}</span>
-          <button className="btn btn-secondary" onClick={() => void handleCopyCode()}>
-            {copied ? "¡Copiado!" : "Copiar código"}
-          </button>
+          <div className="online-code-actions">
+            <button className="btn btn-secondary" onClick={() => void handleCopyCode()}>
+              {copied ? "¡Copiado!" : "Copiar código"}
+            </button>
+            <button className="btn btn-secondary" onClick={() => void handleCopyGameLink()}>
+              {copiedLink ? "¡Copiado!" : "Copiar enlace"}
+            </button>
+          </div>
         </div>
         <p>
           Tablero: {game.boardSize} × {game.boardSize} · Komi {game.komi}
@@ -115,26 +193,42 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
         <div className="online-roster">
           <div className="online-roster-team">
             <h2>
-              <span className="stone-dot stone-dot-black" /> Negras ({blackRoster.length})
+              <span className="stone-dot stone-dot-black" /> Negras ({blackRoster.length}/
+              {blackRoster.length + blackPending.length})
             </h2>
             {blackRoster.map((p) => (
               <PlayerDot key={p.guestId} player={p} connected={connectedGuestIds.has(p.guestId)} />
             ))}
+            {blackPending.map((seat, i) => (
+              <PendingSeatRow
+                key={`black-pending-${i}`}
+                seat={seat}
+                onCopy={(token) => void handleCopySeatInvite(token)}
+                copied={copiedSeatToken === seat.inviteToken}
+              />
+            ))}
           </div>
           <div className="online-roster-team">
             <h2>
-              <span className="stone-dot stone-dot-white" /> Blancas ({whiteRoster.length})
+              <span className="stone-dot stone-dot-white" /> Blancas ({whiteRoster.length}/
+              {whiteRoster.length + whitePending.length})
             </h2>
             {whiteRoster.map((p) => (
               <PlayerDot key={p.guestId} player={p} connected={connectedGuestIds.has(p.guestId)} />
+            ))}
+            {whitePending.map((seat, i) => (
+              <PendingSeatRow
+                key={`white-pending-${i}`}
+                seat={seat}
+                onCopy={(token) => void handleCopySeatInvite(token)}
+                copied={copiedSeatToken === seat.inviteToken}
+              />
             ))}
           </div>
         </div>
 
         <p className="online-waiting">
-          {isFull
-            ? `Sala completa (${totalActive}/${game.maxPlayers}). Ya podéis empezar.`
-            : `Esperando más jugadores… (${totalActive}/${game.maxPlayers})`}
+          {isFull ? "Sala completa. Ya podéis empezar." : `Esperando más jugadores… (${totalActive}/${game.maxPlayers})`}
         </p>
         {canStart && !isFull && (
           <p className="online-waiting">Ya hay al menos uno en cada color: puedes empezar cuando quieras.</p>
@@ -142,16 +236,35 @@ export default function OnlineGameScreen({ gameId, onExit }: OnlineGameScreenPro
 
         {actionError && <p className="error-banner">{actionError}</p>}
 
-        <div className="online-waiting-actions">
-          {you?.isCreator && (
-            <button className="btn btn-primary" onClick={() => void start()} disabled={!canStart}>
-              Empezar partida
+        {isMember ? (
+          <div className="online-waiting-actions">
+            {you?.isCreator && (
+              <button className="btn btn-primary" onClick={() => void start()} disabled={!canStart}>
+                Empezar partida
+              </button>
+            )}
+            <button className="btn btn-secondary" onClick={() => void handleLeave()}>
+              {you?.isCreator ? "Cancelar partida" : "Salir"}
             </button>
-          )}
-          <button className="btn btn-secondary" onClick={() => void handleLeave()}>
-            {you?.isCreator ? "Cancelar partida" : "Salir"}
-          </button>
-        </div>
+          </div>
+        ) : (
+          !isFull && (
+            <div className="online-join-panel">
+              <input
+                className="setup-input"
+                type="text"
+                value={joinName}
+                onChange={(e) => setJoinName(e.target.value)}
+                placeholder="Tu nombre (opcional)"
+                maxLength={24}
+                disabled={isJoining}
+              />
+              <button className="btn btn-primary" onClick={() => void handleJoin()} disabled={isJoining}>
+                {isJoining ? "Uniéndose…" : "Unirse a esta partida"}
+              </button>
+            </div>
+          )
+        )}
       </div>
     );
   }

@@ -1,5 +1,5 @@
 import type { Player } from "../types/game.js";
-import type { OnlineGame, OnlinePlayer, YouInfo } from "./types.js";
+import type { GameMutationResponse, GameResponse, OnlineGame, OnlinePlayer, PendingSeat, YouInfo } from "./types.js";
 
 /** Active (not-left) members of `team`, in join order — used for both display and turn rotation. */
 export function activeRoster(game: OnlineGame, team: Player): OnlinePlayer[] {
@@ -43,4 +43,26 @@ export function buildYouInfo(game: OnlineGame, guestId: string | null): YouInfo 
     isCreator: me?.isCreator ?? false,
     isYourTurn,
   };
+}
+
+/**
+ * Invite tokens are secrets the creator hands out one at a time — strip them from a
+ * pending seat before it reaches anyone else, so the only way to learn a seat's token
+ * is to be given its link directly.
+ */
+function visiblePendingSeats(game: OnlineGame, isCreator: boolean): PendingSeat[] {
+  if (isCreator) return game.pendingSeats;
+  return game.pendingSeats.map(({ team, turnOrder }) => ({ team, turnOrder }));
+}
+
+/** Builds the full `{ game, you }` response every game-fetching/creating/joining endpoint sends back. */
+export function buildGameResponse(game: OnlineGame, guestId: string | null): GameResponse {
+  const you = buildYouInfo(game, guestId);
+  return { game: { ...game, pendingSeats: visiblePendingSeats(game, you.isCreator) }, you };
+}
+
+/** Builds the `{ game }` response every in-game mutation (move/pass/mark-dead/finalize/leave/start) sends back. */
+export function buildMutationResponse(game: OnlineGame, guestId: string | null): GameMutationResponse {
+  const you = buildYouInfo(game, guestId);
+  return { game: { ...game, pendingSeats: visiblePendingSeats(game, you.isCreator) } };
 }

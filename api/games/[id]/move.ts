@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { opponent } from "../../../src/utils/board.js";
 import { tryMove, MOVE_ERROR_MESSAGES } from "../../../src/utils/move.js";
-import type { GameMutationResponse } from "../../../src/online/types.js";
+import { buildMutationResponse } from "../../../src/online/turns.js";
 import { withHandler, readBody } from "../../_lib/http.js";
 import { checkRateLimit } from "../../_lib/rateLimit.js";
 import { Errors } from "../../_lib/errors.js";
@@ -62,6 +62,5 @@ export default withHandler(["POST"], async (req: VercelRequest, res: VercelRespo
     last_move: { row, col },
   });
 
-  const response: GameMutationResponse = { game: updated };
-  res.status(200).json(response);
+  res.status(200).json(buildMutationResponse(updated, guestId));
 });

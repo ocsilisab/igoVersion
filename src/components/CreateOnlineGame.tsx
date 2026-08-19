@@ -1,8 +1,10 @@
-import { useState } from "react";
-import type { BoardSize, Player } from "../types/game";
-import { DEFAULT_KOMI } from "../types/game";
+import { useMemo, useState } from "react";
+import type { BoardSize, Player, TeamRoster } from "../types/game";
+import { DEFAULT_KOMI, MIN_TOTAL_PLAYERS, MAX_TOTAL_PLAYERS } from "../types/game";
+import { assignSeatTeams } from "../online/teamAssignment";
 import { createOnlineGame, OnlineApiError } from "../online/api";
 import KomiSelector from "./KomiSelector";
+import TeamSplitPreview from "./TeamSplitPreview";
 import "./GameSetup.css";
 
 interface CreateOnlineGameProps {
@@ -12,25 +14,23 @@ interface CreateOnlineGameProps {
 
 const BOARD_SIZES: BoardSize[] = [9, 13, 19];
 
-interface PlayerCountOption {
-  value: number;
-  label: string;
-}
-
-const PLAYER_COUNT_OPTIONS: PlayerCountOption[] = [
-  { value: 2, label: "1 contra 1" },
-  { value: 4, label: "Hasta 4 (equipos)" },
-  { value: 6, label: "Hasta 6 (equipos)" },
-];
-
 export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGameProps) {
   const [boardSize, setBoardSize] = useState<BoardSize>(9);
-  const [maxPlayers, setMaxPlayers] = useState<number>(2);
+  const [maxPlayers, setMaxPlayers] = useState<number>(MIN_TOTAL_PLAYERS);
   const [creatorColor, setCreatorColor] = useState<Player>("black");
   const [komi, setKomi] = useState<number>(DEFAULT_KOMI);
   const [displayName, setDisplayName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const teamsPreview = useMemo<TeamRoster>(() => {
+    const seatTeams = assignSeatTeams(creatorColor, maxPlayers);
+    const teams: TeamRoster = { black: [], white: [] };
+    seatTeams.forEach((team, index) => {
+      teams[team].push(index === 0 ? "Tú" : `Jugador ${index + 1}`);
+    });
+    return teams;
+  }, [creatorColor, maxPlayers]);
 
   const handleCreate = async () => {
     setIsCreating(true);
@@ -59,8 +59,8 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
 
         <h1 className="setup-title">Crear partida online</h1>
         <p className="setup-subtitle">
-          Comparte el código cuando la partida esté creada. Elige cuántos jugadores caben en la sala — la partida se
-          podrá empezar en cuanto haya al menos uno en cada color, sin esperar a llenarla.
+          Añade tantas plazas como jugadores esperas — cada una genera su propio enlace de invitación. La partida se
+          podrá empezar en cuanto haya al menos uno en cada color, sin esperar a llenar el resto de plazas.
         </p>
 
         <section className="setup-section">
@@ -80,20 +80,42 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
         </section>
 
         <section className="setup-section">
-          <h2>Número de jugadores</h2>
-          <div className="setup-options">
-            {PLAYER_COUNT_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                className={`setup-option ${maxPlayers === option.value ? "setup-option-active" : ""}`}
-                onClick={() => setMaxPlayers(option.value)}
-                disabled={isCreating}
-              >
-                {option.label}
-              </button>
+          <h2>
+            Jugadores ({maxPlayers}/{MAX_TOTAL_PLAYERS})
+          </h2>
+          <div className="player-roster">
+            {Array.from({ length: maxPlayers }, (_, index) => (
+              <div className="player-roster-row" key={index}>
+                <span className="setup-input online-seat-label">
+                  {index === 0 ? "Tú (creador/a)" : `Jugador ${index + 1} — enlace de invitación`}
+                </span>
+                {index === maxPlayers - 1 && maxPlayers > MIN_TOTAL_PLAYERS && (
+                  <button
+                    type="button"
+                    className="player-roster-remove"
+                    onClick={() => setMaxPlayers((n) => n - 1)}
+                    disabled={isCreating}
+                    aria-label="Quitar plaza"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             ))}
           </div>
+          {maxPlayers < MAX_TOTAL_PLAYERS && (
+            <button
+              type="button"
+              className="btn btn-secondary player-roster-add"
+              onClick={() => setMaxPlayers((n) => n + 1)}
+              disabled={isCreating}
+            >
+              + Añadir jugador
+            </button>
+          )}
         </section>
+
+        <TeamSplitPreview teams={teamsPreview} />
 
         <section className="setup-section">
           <h2>Tu color</h2>

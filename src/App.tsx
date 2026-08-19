@@ -45,11 +45,17 @@ function readGameIdFromUrl(): string | null {
   return new URLSearchParams(window.location.search).get("game");
 }
 
+/** A personal invite link (`?game=<id>&token=<token>`) — see CreateOnlineGame/OnlineGameScreen. */
+function readInviteTokenFromUrl(): string | null {
+  return new URLSearchParams(window.location.search).get("token");
+}
+
 export default function App() {
   const [screen, setScreen] = useState<Screen>(() => (readGameIdFromUrl() ? "online-game" : "home"));
   const [soloConfig, setSoloConfig] = useState<SoloConfig | null>(null);
   const [aiConfig, setAiConfig] = useState<AiConfig | null>(null);
   const [onlineGameId, setOnlineGameId] = useState<string | null>(() => readGameIdFromUrl());
+  const [inviteToken] = useState<string | null>(() => readInviteTokenFromUrl());
 
   useEffect(() => {
     const onPopState = () => {
@@ -147,7 +153,7 @@ export default function App() {
   }
 
   if (screen === "online-game" && onlineGameId) {
-    return <OnlineGameScreen gameId={onlineGameId} onExit={goHome} />;
+    return <OnlineGameScreen gameId={onlineGameId} inviteToken={inviteToken} onExit={goHome} />;
   }
 
   return null;

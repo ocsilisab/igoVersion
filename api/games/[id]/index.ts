@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import type { GameResponse } from "../../../src/online/types.js";
-import { buildYouInfo } from "../../../src/online/turns.js";
+import { buildGameResponse } from "../../../src/online/turns.js";
 import { withHandler } from "../../_lib/http.js";
 import { Errors } from "../../_lib/errors.js";
 import { readGuestId } from "../../_lib/session.js";
@@ -19,6 +18,5 @@ export default withHandler(["GET"], async (req: VercelRequest, res: VercelRespon
   if (!game) throw Errors.notFound();
 
   const guestId = readGuestId(req);
-  const response: GameResponse = { game, you: buildYouInfo(game, guestId) };
-  res.status(200).json(response);
+  res.status(200).json(buildGameResponse(game, guestId));
 });
