@@ -135,17 +135,19 @@ create table if not exists game_players (
   invite_token text
 );
 
-create index if not exists game_players_game_idx on game_players (game_id);
-create unique index if not exists game_players_unique_guest on game_players (game_id, guest_id);
-create unique index if not exists game_players_invite_token_key on game_players (invite_token);
-
 -- Migration for a `game_players` table created before invite links existed. Safe no-ops
--- if already applied.
+-- if already applied. Must run before the indexes below: on an existing table,
+-- `create table if not exists` above is a no-op, so `invite_token` doesn't exist yet
+-- until this adds it.
 alter table game_players alter column guest_id drop not null;
 alter table game_players alter column display_name drop not null;
 alter table game_players alter column joined_at drop not null;
 alter table game_players alter column joined_at drop default;
 alter table game_players add column if not exists invite_token text;
+
+create index if not exists game_players_game_idx on game_players (game_id);
+create unique index if not exists game_players_unique_guest on game_players (game_id, guest_id);
+create unique index if not exists game_players_invite_token_key on game_players (invite_token);
 
 alter table game_players enable row level security;
 
