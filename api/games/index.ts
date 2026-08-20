@@ -16,6 +16,8 @@ interface CreateGameBody {
   komi?: number;
   creatorColor?: string;
   displayName?: string;
+  extensionBombs?: boolean;
+  extensionStars?: boolean;
 }
 
 export default withHandler(["POST"], async (req: VercelRequest, res: VercelResponse) => {
@@ -51,6 +53,7 @@ export default withHandler(["POST"], async (req: VercelRequest, res: VercelRespo
     creatorColor: body.creatorColor as Player,
     guestId,
     displayName,
+    extensions: { bombs: body.extensionBombs === true, stars: body.extensionStars === true },
   });
 
   res.status(201).json(buildGameResponse(game, guestId));

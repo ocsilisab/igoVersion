@@ -1,4 +1,4 @@
-import type { BoardSize, Player } from "../types/game.js";
+import type { BoardSize, ExtensionRules, Player } from "../types/game.js";
 import type { ApiErrorBody, GameMutationResponse, GameResponse } from "./types.js";
 
 export class OnlineApiError extends Error {
@@ -35,11 +35,20 @@ export function createOnlineGame(
   maxPlayers: number,
   komi: number,
   creatorColor: Player,
+  extensions: ExtensionRules,
   displayName?: string
 ): Promise<GameResponse> {
   return request<GameResponse>("/api/games", {
     method: "POST",
-    body: JSON.stringify({ boardSize, maxPlayers, komi, creatorColor, displayName }),
+    body: JSON.stringify({
+      boardSize,
+      maxPlayers,
+      komi,
+      creatorColor,
+      displayName,
+      extensionBombs: extensions.bombs,
+      extensionStars: extensions.stars,
+    }),
   });
 }
 

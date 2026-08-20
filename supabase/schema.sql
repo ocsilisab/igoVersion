@@ -45,6 +45,14 @@ create table if not exists games (
   dead_stones jsonb not null default '[]'::jsonb,
   last_move jsonb,
 
+  -- Optional house rules chosen at setup — see src/utils/extensions.ts. move_count and
+  -- last_bomb only matter while extension_bombs is true (move.ts increments move_count
+  -- on every stone placement and drops a bomb every BOMB_INTERVAL of them).
+  extension_bombs boolean not null default false,
+  extension_stars boolean not null default false,
+  move_count integer not null default 0,
+  last_bomb jsonb,
+
   status text not null default 'waiting' check (status in ('waiting', 'playing', 'finished', 'abandoned')),
   winner text check (winner in ('black', 'white', 'draw')),
   score jsonb,
@@ -71,6 +79,10 @@ alter table games add column if not exists white_turn_index integer not null def
 alter table games add column if not exists abandoned_team text check (abandoned_team in ('black', 'white'));
 alter table games add column if not exists komi numeric(4,1) not null default 6.5;
 alter table games add column if not exists max_players smallint not null default 2 check (max_players between 2 and 6);
+alter table games add column if not exists extension_bombs boolean not null default false;
+alter table games add column if not exists extension_stars boolean not null default false;
+alter table games add column if not exists move_count integer not null default 0;
+alter table games add column if not exists last_bomb jsonb;
 
 create unique index if not exists games_code_key on games (code);
 create index if not exists games_status_idx on games (status);

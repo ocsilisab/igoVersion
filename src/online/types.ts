@@ -1,4 +1,4 @@
-import type { Board, BoardSize, Player, ScoreResult } from "../types/game.js";
+import type { Board, BoardSize, ExtensionRules, Player, ScoreResult } from "../types/game.js";
 
 /**
  * Identity kind. Only "guest" is usable today — see REGISTRATION_ENABLED.
@@ -62,6 +62,11 @@ export interface OnlineGame {
   isScoring: boolean;
   deadStones: string[];
   lastMove: { row: number; col: number } | null;
+
+  extensions: ExtensionRules;
+  /** Stone placements played so far (passes don't count) — drives the "bombas" interval. */
+  moveCount: number;
+  lastBomb: { center: { row: number; col: number }; affected: { row: number; col: number }[] } | null;
 
   status: OnlineGameStatus;
   winner: Player | "draw" | null;

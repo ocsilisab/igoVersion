@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { Board, BoardSize, Player } from "../../src/types/game.js";
+import type { Board, BoardSize, ExtensionRules, Player } from "../../src/types/game.js";
 import { createEmptyBoard, serializeBoard } from "../../src/utils/board.js";
 import type { OnlineGame, OnlineGameStatus, OnlinePlayer, PendingSeat } from "../../src/online/types.js";
 import { getActivePlayer } from "../../src/online/turns.js";
@@ -29,6 +29,10 @@ interface GameRow {
   is_scoring: boolean;
   dead_stones: string[];
   last_move: { row: number; col: number } | null;
+  extension_bombs: boolean;
+  extension_stars: boolean;
+  move_count: number;
+  last_bomb: OnlineGame["lastBomb"];
   status: OnlineGameStatus;
   winner: OnlineGame["winner"];
   score: OnlineGame["score"];
@@ -82,6 +86,9 @@ function rowToGame(row: GameRow, playerRows: PlayerRow[]): OnlineGame {
     isScoring: row.is_scoring,
     deadStones: row.dead_stones,
     lastMove: row.last_move,
+    extensions: { bombs: row.extension_bombs, stars: row.extension_stars },
+    moveCount: row.move_count,
+    lastBomb: row.last_bomb,
     status: row.status,
     winner: row.winner,
     score: row.score,
@@ -128,6 +135,7 @@ export interface CreateGameInput {
   creatorColor: Player;
   guestId: string;
   displayName: string;
+  extensions: ExtensionRules;
 }
 
 export async function createGame({
@@ -137,6 +145,7 @@ export async function createGame({
   creatorColor,
   guestId,
   displayName,
+  extensions,
 }: CreateGameInput): Promise<OnlineGame> {
   const supabase = getSupabaseAdmin();
   const board = createEmptyBoard(boardSize);
@@ -156,6 +165,8 @@ export async function createGame({
         history: [serializeBoard(board)],
         status: "waiting",
         expires_at: expiresAt,
+        extension_bombs: extensions.bombs,
+        extension_stars: extensions.stars,
       })
       .select("*")
       .single();

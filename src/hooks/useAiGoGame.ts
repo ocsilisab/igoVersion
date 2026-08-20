@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { BoardSize, Player, TeamRoster } from "../types/game";
+import type { BoardSize, ExtensionRules, Player, TeamRoster } from "../types/game";
+import { NO_EXTENSIONS } from "../types/game";
 import { useGoGame } from "./useGoGame";
 import { chooseAiMove } from "../ai/chooseMove";
 
@@ -14,9 +15,15 @@ const AI_ROSTER = ["IA"];
  * `pass` calls a human player would use, so it goes through identical validation. The
  * AI's own team is always a single "IA" seat — only the human side can have teammates.
  */
-export function useAiGoGame(initialSize: BoardSize, aiColor: Player, initialKomi: number, humanNames: string[]) {
+export function useAiGoGame(
+  initialSize: BoardSize,
+  aiColor: Player,
+  initialKomi: number,
+  humanNames: string[],
+  initialExtensions: ExtensionRules = NO_EXTENSIONS
+) {
   const teams: TeamRoster = aiColor === "black" ? { black: AI_ROSTER, white: humanNames } : { black: humanNames, white: AI_ROSTER };
-  const game = useGoGame(initialSize, initialKomi, teams);
+  const game = useGoGame(initialSize, initialKomi, teams, initialExtensions);
   const { state, placeStone, pass } = game;
   const [isAiThinking, setIsAiThinking] = useState(false);
   const isThinkingRef = useRef(false);

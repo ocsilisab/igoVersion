@@ -1,12 +1,19 @@
 import { useState } from "react";
-import type { BoardSize, Player } from "../types/game";
-import { DEFAULT_KOMI, MAX_TOTAL_PLAYERS } from "../types/game";
+import type { BoardSize, ExtensionRules, Player } from "../types/game";
+import { DEFAULT_KOMI, MAX_TOTAL_PLAYERS, NO_EXTENSIONS } from "../types/game";
 import KomiSelector from "./KomiSelector";
 import PlayerRoster from "./PlayerRoster";
+import ExtensionsSelector from "./ExtensionsSelector";
 import "./GameSetup.css";
 
 interface GameSetupProps {
-  onStart: (boardSize: BoardSize, playerColor: Player, komi: number, humanNames: string[]) => void;
+  onStart: (
+    boardSize: BoardSize,
+    playerColor: Player,
+    komi: number,
+    humanNames: string[],
+    extensions: ExtensionRules
+  ) => void;
   onCancel: () => void;
 }
 
@@ -18,6 +25,7 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
   const [playerColor, setPlayerColor] = useState<Player>("black");
   const [komi, setKomi] = useState<number>(DEFAULT_KOMI);
   const [humanNames, setHumanNames] = useState<string[]>(["Jugador 1"]);
+  const [extensions, setExtensions] = useState<ExtensionRules>(NO_EXTENSIONS);
 
   return (
     <div className="setup-screen">
@@ -73,9 +81,11 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
 
         <KomiSelector komi={komi} onSelect={setKomi} />
 
+        <ExtensionsSelector extensions={extensions} onChange={setExtensions} />
+
         <button
           className="btn btn-primary setup-start"
-          onClick={() => onStart(boardSize, playerColor, komi, humanNames)}
+          onClick={() => onStart(boardSize, playerColor, komi, humanNames, extensions)}
         >
           Empezar partida
         </button>

@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { opponent } from "../../../src/utils/board.js";
+import { opponent, serializeBoard } from "../../../src/utils/board.js";
 import { tryMove, MOVE_ERROR_MESSAGES } from "../../../src/utils/move.js";
+import { applyHoshiConversion, dropBomb, BOMB_INTERVAL } from "../../../src/utils/extensions.js";
 import { buildMutationResponse } from "../../../src/online/turns.js";
 import { withHandler, readBody } from "../../_lib/http.js";
 import { checkRateLimit } from "../../_lib/rateLimit.js";
@@ -48,18 +49,40 @@ export default withHandler(["POST"], async (req: VercelRequest, res: VercelRespo
   const result = tryMove(game.board, game.boardSize, team, { row, col }, game.history);
   if (!result.ok) throw Errors.invalidMove(MOVE_ERROR_MESSAGES[result.reason]);
 
+  // Same "estrellas"/"bombas" house rules the local modes apply — see utils/extensions.ts
+  // and useGoGame.ts::placeStone, which this mirrors so the server never diverges from
+  // what a local game would do with the same rules enabled.
+  let finalBoard = result.board;
+  let extraCaptured = 0;
+  if (game.extensions.stars) {
+    const conversion = applyHoshiConversion(finalBoard, game.boardSize, { row, col }, team);
+    finalBoard = conversion.board;
+    extraCaptured = conversion.extraCaptured;
+  }
+
+  const moveCount = game.moveCount + 1;
+  let lastBomb = game.lastBomb;
+  if (game.extensions.bombs && moveCount % BOMB_INTERVAL === 0) {
+    const bomb = dropBomb(finalBoard, game.boardSize);
+    finalBoard = bomb.board;
+    lastBomb = { center: bomb.center, affected: bomb.affected };
+  }
+
+  const capturedCount = result.capturedCount + extraCaptured;
   const turnField = team === "black" ? "black_turn_index" : "white_turn_index";
   const currentTurnIndex = team === "black" ? game.blackTurnIndex : game.whiteTurnIndex;
 
   const updated = await applyGameUpdate(game, {
-    board: result.board,
+    board: finalBoard,
     current_player: opponent(team),
     [turnField]: currentTurnIndex + 1,
-    black_captures: game.blackCaptures + (team === "black" ? result.capturedCount : 0),
-    white_captures: game.whiteCaptures + (team === "white" ? result.capturedCount : 0),
+    black_captures: game.blackCaptures + (team === "black" ? capturedCount : 0),
+    white_captures: game.whiteCaptures + (team === "white" ? capturedCount : 0),
     consecutive_passes: 0,
-    history: [...game.history, result.boardState],
+    history: [...game.history, serializeBoard(finalBoard)],
     last_move: { row, col },
+    move_count: moveCount,
+    last_bomb: lastBomb,
   });
 
   res.status(200).json(buildMutationResponse(updated, guestId));

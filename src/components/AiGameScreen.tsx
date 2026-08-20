@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAiGoGame } from "../hooks/useAiGoGame";
-import type { BoardSize, Player } from "../types/game";
+import type { BoardSize, ExtensionRules, Player } from "../types/game";
+import { NO_EXTENSIONS } from "../types/game";
 import GoBoard from "./GoBoard";
 import GameInfo from "./GameInfo";
 import GameControls from "./GameControls";
@@ -13,10 +14,18 @@ interface AiGameScreenProps {
   playerColor: Player;
   komi: number;
   humanNames: string[];
+  extensions?: ExtensionRules;
   onExit: () => void;
 }
 
-export default function AiGameScreen({ boardSize, playerColor, komi, humanNames, onExit }: AiGameScreenProps) {
+export default function AiGameScreen({
+  boardSize,
+  playerColor,
+  komi,
+  humanNames,
+  extensions = NO_EXTENSIONS,
+  onExit,
+}: AiGameScreenProps) {
   const aiColor: Player = playerColor === "black" ? "white" : "black";
   const {
     state,
@@ -29,7 +38,7 @@ export default function AiGameScreen({ boardSize, playerColor, komi, humanNames,
     toggleDeadGroup,
     finalizeScoring,
     resetGame,
-  } = useAiGoGame(boardSize, aiColor, komi, humanNames);
+  } = useAiGoGame(boardSize, aiColor, komi, humanNames, extensions);
   const [confirmReset, setConfirmReset] = useState(false);
 
   const isPlayerTurn = !state.gameOver && !state.isScoring && !isAiThinking && state.currentPlayer === playerColor;
@@ -66,6 +75,11 @@ export default function AiGameScreen({ boardSize, playerColor, komi, humanNames,
       />
 
       {lastError && <p className="error-banner">{lastError}</p>}
+      {state.lastBomb && !state.gameOver && (
+        <p className="setup-hint">
+          💣 Última bomba en fila {state.lastBomb.center.row + 1}, columna {state.lastBomb.center.col + 1}.
+        </p>
+      )}
 
       <GoBoard
         board={state.board}
@@ -76,6 +90,7 @@ export default function AiGameScreen({ boardSize, playerColor, komi, humanNames,
         overlayText={isAiThinking ? "La IA está pensando…" : undefined}
         deadStones={state.isScoring ? state.deadStones : undefined}
         onToggleDead={state.isScoring ? toggleDeadGroup : undefined}
+        lastBomb={state.lastBomb}
       />
 
       <GameControls

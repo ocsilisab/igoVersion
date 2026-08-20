@@ -34,6 +34,7 @@ interface AiConfig {
   playerColor: Player;
   komi: number;
   humanNames: string[];
+  extensions: ExtensionRules;
 }
 
 /**
@@ -122,8 +123,8 @@ export default function App() {
     return (
       <GameSetup
         onCancel={() => setScreen("home")}
-        onStart={(boardSize, playerColor, komi, humanNames) => {
-          setAiConfig({ boardSize, playerColor, komi, humanNames });
+        onStart={(boardSize, playerColor, komi, humanNames, extensions) => {
+          setAiConfig({ boardSize, playerColor, komi, humanNames, extensions });
           setScreen("ai-game");
         }}
       />
@@ -137,6 +138,7 @@ export default function App() {
         playerColor={aiConfig.playerColor}
         komi={aiConfig.komi}
         humanNames={aiConfig.humanNames}
+        extensions={aiConfig.extensions}
         onExit={() => setScreen("home")}
       />
     );

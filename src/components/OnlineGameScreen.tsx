@@ -188,6 +188,8 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit }: Online
         </div>
         <p>
           Tablero: {game.boardSize} × {game.boardSize} · Komi {game.komi}
+          {game.extensions.bombs && " · 💣 Bombas"}
+          {game.extensions.stars && " · ⭐ Estrellas"}
         </p>
 
         <div className="online-roster">
@@ -299,6 +301,8 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit }: Online
         <h1 className="game-title">Partida {game.code}</h1>
         <span className="board-size-label">
           {game.boardSize} × {game.boardSize} · Komi {game.komi}
+          {game.extensions.bombs && " · 💣"}
+          {game.extensions.stars && " · ⭐"}
         </span>
       </header>
 
@@ -331,6 +335,11 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit }: Online
           {actionError}
         </p>
       )}
+      {game.lastBomb && game.status !== "finished" && (
+        <p className="setup-hint">
+          💣 Última bomba en fila {game.lastBomb.center.row + 1}, columna {game.lastBomb.center.col + 1}.
+        </p>
+      )}
 
       <GoBoard
         board={game.board}
@@ -340,6 +349,7 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit }: Online
         disabled={boardDisabled}
         deadStones={game.isScoring ? new Set(game.deadStones) : undefined}
         onToggleDead={game.isScoring ? (pos) => void toggleDeadGroup(pos.row, pos.col) : undefined}
+        lastBomb={game.lastBomb}
       />
 
       <div className="game-controls">

@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import type { BoardSize, Player, TeamRoster } from "../types/game";
-import { DEFAULT_KOMI, MIN_TOTAL_PLAYERS, MAX_TOTAL_PLAYERS } from "../types/game";
+import type { BoardSize, ExtensionRules, Player, TeamRoster } from "../types/game";
+import { DEFAULT_KOMI, MIN_TOTAL_PLAYERS, MAX_TOTAL_PLAYERS, NO_EXTENSIONS } from "../types/game";
 import { assignSeatTeams } from "../online/teamAssignment";
 import { createOnlineGame, OnlineApiError } from "../online/api";
 import KomiSelector from "./KomiSelector";
 import TeamSplitPreview from "./TeamSplitPreview";
+import ExtensionsSelector from "./ExtensionsSelector";
 import "./GameSetup.css";
 
 interface CreateOnlineGameProps {
@@ -19,6 +20,7 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
   const [maxPlayers, setMaxPlayers] = useState<number>(MIN_TOTAL_PLAYERS);
   const [creatorColor, setCreatorColor] = useState<Player>("black");
   const [komi, setKomi] = useState<number>(DEFAULT_KOMI);
+  const [extensions, setExtensions] = useState<ExtensionRules>(NO_EXTENSIONS);
   const [displayName, setDisplayName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +43,7 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
         maxPlayers,
         komi,
         creatorColor,
+        extensions,
         displayName.trim() || undefined
       );
       onCreated(game.id);
@@ -138,6 +141,8 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
         </section>
 
         <KomiSelector komi={komi} onSelect={setKomi} disabled={isCreating} />
+
+        <ExtensionsSelector extensions={extensions} onChange={setExtensions} disabled={isCreating} />
 
         <section className="setup-section">
           <h2>Tu nombre (opcional)</h2>
