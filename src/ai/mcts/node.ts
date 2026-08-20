@@ -28,3 +28,16 @@ export interface MctsNode {
 export function isTerminal(node: MctsNode): boolean {
   return node.consecutivePasses >= 2;
 }
+
+/**
+ * Appends a board state, keeping only the last 2 entries — Ko-checking
+ * (utils/move.ts::tryMove → utils/ko.ts::violatesKo) only ever reads `history[length-2]`,
+ * so nothing beyond that is ever needed. Fase 1 self-play testing found that growing the
+ * *actual* history array (via `[...history, x]`) on every single rollout ply made
+ * simulations progressively slower the deeper into a real game they started from — this
+ * keeps history bounded to a fixed, cheap-to-allocate size regardless of how many real
+ * moves have already been played.
+ */
+export function advanceHistory(history: string[], newState: string): string[] {
+  return history.length >= 1 ? [history[history.length - 1], newState] : [newState];
+}

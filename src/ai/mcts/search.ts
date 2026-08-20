@@ -2,7 +2,7 @@ import type { Board, BoardSize, Player, Position } from "../../types/game.js";
 import { opponent } from "../../utils/board.js";
 import { tryMove } from "../../utils/move.js";
 import type { MctsMove, MctsNode } from "./node.js";
-import { isTerminal } from "./node.js";
+import { isTerminal, advanceHistory } from "./node.js";
 import { uctScore } from "./uct.js";
 import { rollout } from "./simulate.js";
 
@@ -102,7 +102,7 @@ function applyMove(node: MctsNode, move: MctsMove, boardSize: BoardSize): MctsNo
     move,
     playerJustMoved: toMove,
     board,
-    history: [...node.history, boardState],
+    history: advanceHistory(node.history, boardState),
     consecutivePasses: 0,
     parent: node,
     children: [],

@@ -3,6 +3,7 @@ import { opponent, posKey } from "../../utils/board.js";
 import { getGroup } from "../../utils/liberties.js";
 import { tryMove, type MoveResult } from "../../utils/move.js";
 import { calculateScore } from "../../utils/scoring.js";
+import { advanceHistory } from "./node.js";
 
 /** The subset of MoveResult that pickRolloutMove ever returns — only ever legal moves. */
 type LegalMoveResult = Extract<MoveResult, { ok: true }>;
@@ -134,7 +135,7 @@ export function rollout(
       passes++;
     } else {
       currentBoard = result.board;
-      currentHistory = [...currentHistory, result.boardState];
+      currentHistory = advanceHistory(currentHistory, result.boardState);
       passes = 0;
     }
 

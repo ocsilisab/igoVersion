@@ -4,7 +4,7 @@ import { DEFAULT_AI_DIFFICULTY, NO_EXTENSIONS } from "../types/game";
 import { useGoGame } from "./useGoGame";
 import { useMctsWorker } from "./useMctsWorker";
 import { chooseAiMove } from "../ai/chooseMove";
-import { MCTS_TIME_BUDGET_MS } from "../ai/mcts/chooseMctsMove";
+import { mctsTimeBudgetMs } from "../ai/mcts/chooseMctsMove";
 
 const AI_MIN_THINK_MS = 500;
 const AI_MAX_THINK_MS = 1000;
@@ -59,12 +59,15 @@ export function useAiGoGame(
         {
           board: state.board,
           boardSize: state.boardSize,
-          history: state.history,
+          // Only the last 2 board states are ever read (Ko-checking) — trimming here
+          // keeps the postMessage payload small even deep into a long game instead of
+          // structured-cloning the whole move history on every single AI turn.
+          history: state.history.slice(-2),
           toMove: aiColor,
           consecutivePasses: state.consecutivePasses,
           komi: state.komi,
         },
-        MCTS_TIME_BUDGET_MS
+        mctsTimeBudgetMs(state.boardSize)
       ).then(finish);
 
       return () => {
