@@ -3,7 +3,7 @@ import type { BoardSize, ExtensionRules, GameState, Player, Position, ScoreResul
 import { DEFAULT_KOMI, NO_EXTENSIONS } from "../types/game";
 import { createEmptyBoard, opponent, serializeBoard } from "../utils/board";
 import { calculateScore, removeDeadStones } from "../utils/scoring";
-import { toggleDeadStoneGroup } from "../utils/deadStones";
+import { toggleDeadStoneGroup, suggestDeadGroups } from "../utils/deadStones";
 import { activeTeamMember } from "../utils/teams";
 import { tryMove, MOVE_ERROR_MESSAGES } from "../utils/move";
 import { applyHoshiConversion, dropBomb, BOMB_INTERVAL } from "../utils/extensions";
@@ -111,8 +111,17 @@ export function useGoGame(
 
       if (consecutivePasses >= 2) {
         // Two passes in a row end active play, but the game isn't over yet: players
-        // first mark dead stones (toggleDeadGroup) and confirm with finalizeScoring.
-        return { ...prev, consecutivePasses, currentPlayer: nextPlayer, turnIndex, isScoring: true };
+        // review/adjust the dead-group suggestion (toggleDeadGroup) and confirm with
+        // finalizeScoring. suggestDeadGroups pre-marks anything without two eyes so the
+        // board doesn't start the scoring phase looking untouched.
+        return {
+          ...prev,
+          consecutivePasses,
+          currentPlayer: nextPlayer,
+          turnIndex,
+          isScoring: true,
+          deadStones: suggestDeadGroups(prev.board, prev.boardSize),
+        };
       }
 
       return { ...prev, consecutivePasses, currentPlayer: nextPlayer, turnIndex };
