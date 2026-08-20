@@ -3,20 +3,15 @@ import type { AiDifficulty, BoardSize, ExtensionRules, GameState, Player, Positi
 import { DEFAULT_AI_DIFFICULTY, NO_EXTENSIONS } from "../types/game";
 import { useGoGame } from "./useGoGame";
 import { chooseAiMove } from "../ai/chooseMove";
+import { chooseMctsMove } from "../ai/mcts/chooseMctsMove";
 
 const AI_MIN_THINK_MS = 500;
 const AI_MAX_THINK_MS = 1000;
 const AI_ROSTER = ["IA"];
 
-/**
- * Picks the move-choosing function for a difficulty. "dificil" is meant to route to the
- * MCTS engine (src/ai/mcts/chooseMctsMove) once it exists — until then both difficulties
- * share the same reactive heuristic, so the UI's Fácil/Difícil selector can be built and
- * tested ahead of the engine without misbehaving.
- */
+/** Picks the move-choosing function for a difficulty — see ai/chooseMove.ts vs ai/mcts/. */
 function pickEngine(difficulty: AiDifficulty): (state: GameState, aiColor: Player) => Position | null {
-  void difficulty; // both branches are identical for now — see the doc comment above
-  return chooseAiMove;
+  return difficulty === "dificil" ? chooseMctsMove : chooseAiMove;
 }
 
 /**
@@ -49,7 +44,12 @@ export function useAiGoGame(
     isThinkingRef.current = true;
     setIsAiThinking(true);
 
-    const delay = AI_MIN_THINK_MS + Math.random() * (AI_MAX_THINK_MS - AI_MIN_THINK_MS);
+    // "Difícil" (MCTS) already spends real seconds searching — the cosmetic minimum
+    // delay is only for "Fácil", whose engine returns near-instantly on its own. Either
+    // way this still goes through setTimeout (even at 0ms) so React gets to paint the
+    // "pensando" state before the engine call blocks the main thread — see Fase 3 for
+    // moving that block off the main thread entirely via a Web Worker.
+    const delay = difficulty === "dificil" ? 0 : AI_MIN_THINK_MS + Math.random() * (AI_MAX_THINK_MS - AI_MIN_THINK_MS);
     const timer = window.setTimeout(() => {
       const move = engine(state, aiColor);
       if (move) {
@@ -66,7 +66,7 @@ export function useAiGoGame(
       isThinkingRef.current = false;
       setIsAiThinking(false);
     };
-  }, [state, aiColor, placeStone, pass, engine]);
+  }, [state, aiColor, placeStone, pass, engine, difficulty]);
 
   return { ...game, isAiThinking };
 }
