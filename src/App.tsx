@@ -8,7 +8,7 @@ import OnlineSetup from "./components/OnlineSetup";
 import CreateOnlineGame from "./components/CreateOnlineGame";
 import JoinOnlineGame from "./components/JoinOnlineGame";
 import OnlineGameScreen from "./components/OnlineGameScreen";
-import type { BoardSize, ExtensionRules, Player, TeamRoster } from "./types/game";
+import type { AiDifficulty, BoardSize, ExtensionRules, Player, TeamRoster } from "./types/game";
 import "./App.css";
 
 type Screen =
@@ -35,6 +35,7 @@ interface AiConfig {
   komi: number;
   humanNames: string[];
   extensions: ExtensionRules;
+  difficulty: AiDifficulty;
 }
 
 /**
@@ -123,8 +124,8 @@ export default function App() {
     return (
       <GameSetup
         onCancel={() => setScreen("home")}
-        onStart={(boardSize, playerColor, komi, humanNames, extensions) => {
-          setAiConfig({ boardSize, playerColor, komi, humanNames, extensions });
+        onStart={(boardSize, playerColor, komi, humanNames, extensions, difficulty) => {
+          setAiConfig({ boardSize, playerColor, komi, humanNames, extensions, difficulty });
           setScreen("ai-game");
         }}
       />
@@ -139,6 +140,7 @@ export default function App() {
         komi={aiConfig.komi}
         humanNames={aiConfig.humanNames}
         extensions={aiConfig.extensions}
+        difficulty={aiConfig.difficulty}
         onExit={() => setScreen("home")}
       />
     );

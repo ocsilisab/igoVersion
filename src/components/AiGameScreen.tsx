@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAiGoGame } from "../hooks/useAiGoGame";
-import type { BoardSize, ExtensionRules, Player } from "../types/game";
-import { NO_EXTENSIONS } from "../types/game";
+import type { AiDifficulty, BoardSize, ExtensionRules, Player } from "../types/game";
+import { DEFAULT_AI_DIFFICULTY, NO_EXTENSIONS } from "../types/game";
 import GoBoard from "./GoBoard";
 import GameInfo from "./GameInfo";
 import GameControls from "./GameControls";
@@ -15,6 +15,7 @@ interface AiGameScreenProps {
   komi: number;
   humanNames: string[];
   extensions?: ExtensionRules;
+  difficulty?: AiDifficulty;
   onExit: () => void;
 }
 
@@ -24,6 +25,7 @@ export default function AiGameScreen({
   komi,
   humanNames,
   extensions = NO_EXTENSIONS,
+  difficulty = DEFAULT_AI_DIFFICULTY,
   onExit,
 }: AiGameScreenProps) {
   const aiColor: Player = playerColor === "black" ? "white" : "black";
@@ -38,7 +40,7 @@ export default function AiGameScreen({
     toggleDeadGroup,
     finalizeScoring,
     resetGame,
-  } = useAiGoGame(boardSize, aiColor, komi, humanNames, extensions);
+  } = useAiGoGame(boardSize, aiColor, komi, humanNames, extensions, difficulty);
   const [confirmReset, setConfirmReset] = useState(false);
 
   const isPlayerTurn = !state.gameOver && !state.isScoring && !isAiThinking && state.currentPlayer === playerColor;
@@ -54,7 +56,7 @@ export default function AiGameScreen({
         <button className="link-button" onClick={onExit}>
           ← Inicio
         </button>
-        <h1 className="game-title">Go · vs IA</h1>
+        <h1 className="game-title">Go · vs IA ({difficulty === "dificil" ? "Difícil" : "Fácil"})</h1>
         <span className="board-size-label">
           {state.boardSize} × {state.boardSize} · Komi {state.komi}
         </span>

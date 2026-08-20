@@ -81,3 +81,13 @@ export interface GameState {
 
 /** Reserved for future modes (AI / online) so the UI can branch without changing core game logic. */
 export type GameMode = "solo" | "ai" | "online";
+
+/**
+ * AI opponent strength for "Jugar con IA". "facil" is the reactive one-ply heuristic in
+ * src/ai/chooseMove.ts; "dificil" is meant to route to a Monte Carlo Tree Search engine
+ * (src/ai/mcts/) with real lookahead, planned in phases — until that lands, both
+ * difficulties call the same chooseAiMove, so this type is wired up ahead of the engine.
+ */
+export type AiDifficulty = "facil" | "dificil";
+
+export const DEFAULT_AI_DIFFICULTY: AiDifficulty = "facil";

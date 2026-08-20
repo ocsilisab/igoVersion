@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { BoardSize, ExtensionRules, Player } from "../types/game";
-import { DEFAULT_KOMI, MAX_TOTAL_PLAYERS, NO_EXTENSIONS } from "../types/game";
+import type { AiDifficulty, BoardSize, ExtensionRules, Player } from "../types/game";
+import { DEFAULT_AI_DIFFICULTY, DEFAULT_KOMI, MAX_TOTAL_PLAYERS, NO_EXTENSIONS } from "../types/game";
 import KomiSelector from "./KomiSelector";
 import PlayerRoster from "./PlayerRoster";
 import ExtensionsSelector from "./ExtensionsSelector";
@@ -12,7 +12,8 @@ interface GameSetupProps {
     playerColor: Player,
     komi: number,
     humanNames: string[],
-    extensions: ExtensionRules
+    extensions: ExtensionRules,
+    difficulty: AiDifficulty
   ) => void;
   onCancel: () => void;
 }
@@ -20,12 +21,18 @@ interface GameSetupProps {
 const BOARD_SIZES: BoardSize[] = [9, 13, 19];
 const MAX_HUMAN_PLAYERS = MAX_TOTAL_PLAYERS - 1; // the AI always takes one seat
 
+const DIFFICULTIES: { value: AiDifficulty; label: string }[] = [
+  { value: "facil", label: "Fácil" },
+  { value: "dificil", label: "Difícil" },
+];
+
 export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
   const [boardSize, setBoardSize] = useState<BoardSize>(9);
   const [playerColor, setPlayerColor] = useState<Player>("black");
   const [komi, setKomi] = useState<number>(DEFAULT_KOMI);
   const [humanNames, setHumanNames] = useState<string[]>(["Jugador 1"]);
   const [extensions, setExtensions] = useState<ExtensionRules>(NO_EXTENSIONS);
+  const [difficulty, setDifficulty] = useState<AiDifficulty>(DEFAULT_AI_DIFFICULTY);
 
   return (
     <div className="setup-screen">
@@ -79,13 +86,28 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
           max={MAX_HUMAN_PLAYERS}
         />
 
+        <section className="setup-section">
+          <h2>Dificultad de la IA</h2>
+          <div className="setup-options">
+            {DIFFICULTIES.map((option) => (
+              <button
+                key={option.value}
+                className={`setup-option ${difficulty === option.value ? "setup-option-active" : ""}`}
+                onClick={() => setDifficulty(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </section>
+
         <KomiSelector komi={komi} onSelect={setKomi} />
 
         <ExtensionsSelector extensions={extensions} onChange={setExtensions} />
 
         <button
           className="btn btn-primary setup-start"
-          onClick={() => onStart(boardSize, playerColor, komi, humanNames, extensions)}
+          onClick={() => onStart(boardSize, playerColor, komi, humanNames, extensions, difficulty)}
         >
           Empezar partida
         </button>
