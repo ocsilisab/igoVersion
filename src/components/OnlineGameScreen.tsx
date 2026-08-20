@@ -347,25 +347,27 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit }: Online
         lastMove={game.lastMove}
         onPlaceStone={(pos) => void placeStone(pos.row, pos.col)}
         disabled={boardDisabled}
-        deadStones={game.isScoring ? new Set(game.deadStones) : undefined}
+        deadStones={game.isScoring || game.status === "finished" ? new Set(game.deadStones) : undefined}
         onToggleDead={game.isScoring ? (pos) => void toggleDeadGroup(pos.row, pos.col) : undefined}
         lastBomb={game.lastBomb}
       />
 
-      <div className="game-controls">
-        {game.isScoring ? (
-          <button className="btn btn-primary" onClick={() => void finalize()}>
-            Finalizar partida
+      {game.status !== "finished" && (
+        <div className="game-controls">
+          {game.isScoring ? (
+            <button className="btn btn-primary" onClick={() => void finalize()}>
+              Finalizar partida
+            </button>
+          ) : (
+            <button className="btn btn-primary" onClick={() => void pass()} disabled={!isMyTurn}>
+              Pasar
+            </button>
+          )}
+          <button className="btn btn-secondary" onClick={() => setConfirmLeave(true)}>
+            Abandonar partida
           </button>
-        ) : (
-          <button className="btn btn-primary" onClick={() => void pass()} disabled={!isMyTurn}>
-            Pasar
-          </button>
-        )}
-        <button className="btn btn-secondary" onClick={() => setConfirmLeave(true)}>
-          Abandonar partida
-        </button>
-      </div>
+        </div>
+      )}
 
       {confirmLeave && (
         <ConfirmModal

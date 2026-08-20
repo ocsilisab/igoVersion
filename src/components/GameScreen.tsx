@@ -64,18 +64,20 @@ export default function GameScreen({ boardSize, komi, teams, extensions = NO_EXT
         lastMove={state.lastMove}
         onPlaceStone={placeStone}
         disabled={state.gameOver || state.isScoring}
-        deadStones={state.isScoring ? state.deadStones : undefined}
+        deadStones={state.isScoring || state.gameOver ? state.deadStones : undefined}
         onToggleDead={state.isScoring ? toggleDeadGroup : undefined}
         lastBomb={state.lastBomb}
       />
 
-      <GameControls
-        onPass={pass}
-        onReset={() => setConfirmReset(true)}
-        disabled={state.gameOver || state.isScoring}
-        isScoring={state.isScoring}
-        onFinalize={finalizeScoring}
-      />
+      {!state.gameOver && (
+        <GameControls
+          onPass={pass}
+          onReset={() => setConfirmReset(true)}
+          disabled={state.gameOver || state.isScoring}
+          isScoring={state.isScoring}
+          onFinalize={finalizeScoring}
+        />
+      )}
 
       {confirmReset && (
         <ConfirmModal

@@ -20,13 +20,15 @@ export default withHandler(["POST"], async (req: VercelRequest, res: VercelRespo
 
   if (!game.isScoring) throw Errors.invalidMove("La partida no está en fase de puntuación.");
 
+  // Dead stones are only removed for the *score calculation* — the stored board keeps
+  // showing them (still crossed out via dead_stones) so the final board stays reviewable
+  // next to the score table instead of jumping straight to an empty-looking result.
   const { board: cleanedBoard, deadBlack, deadWhite } = removeDeadStones(game.board, new Set(game.deadStones));
   const blackCaptures = game.blackCaptures + deadWhite;
   const whiteCaptures = game.whiteCaptures + deadBlack;
   const score = calculateScore(cleanedBoard, game.boardSize, blackCaptures, whiteCaptures, game.komi);
 
   const updated = await applyGameUpdate(game, {
-    board: cleanedBoard,
     black_captures: blackCaptures,
     white_captures: whiteCaptures,
     is_scoring: false,

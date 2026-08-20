@@ -164,6 +164,24 @@ button {
   justify-content: center;
 }
 
+/* Game-over panel: inline (not an overlay), so the final board stays visible above it. */
+
+.game-over-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px 28px;
+  max-width: 420px;
+  width: 100%;
+  margin: 16px auto 0;
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.game-over-panel h2 {
+  margin-bottom: 12px;
+}
+
 .winner-label {
   font-size: 1.2rem;
   font-weight: 700;

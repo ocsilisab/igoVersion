@@ -131,6 +131,9 @@ export function useGoGame(
     setState((prev) => {
       if (!prev.isScoring) return prev;
 
+      // Dead stones are only removed for the *score calculation* — the board itself keeps
+      // showing them (still crossed out via deadStones) so the final board stays reviewable
+      // next to the score table instead of jumping straight to an empty-looking result.
       const { board: cleanedBoard, deadBlack, deadWhite } = removeDeadStones(prev.board, prev.deadStones);
       const blackCaptures = prev.blackCaptures + deadWhite;
       const whiteCaptures = prev.whiteCaptures + deadBlack;
@@ -138,7 +141,6 @@ export function useGoGame(
 
       return {
         ...prev,
-        board: cleanedBoard,
         blackCaptures,
         whiteCaptures,
         isScoring: false,
