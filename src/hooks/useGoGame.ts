@@ -30,9 +30,16 @@ function createInitialState(size: BoardSize, komi: number, teams: TeamRoster, ex
     deadStones: new Set<string>(),
     gameOver: false,
     lastMove: null,
+    recentMoves: [],
     winner: null,
     score: null,
   };
+}
+
+const RECENT_MOVES_WINDOW = 3;
+
+function pushRecentMove(recentMoves: (Position | null)[], move: Position | null): (Position | null)[] {
+  return [move, ...recentMoves].slice(0, RECENT_MOVES_WINDOW);
 }
 
 /** Advances the rotation for whichever color just took a turn (move or pass) to the next roster member. */
@@ -93,6 +100,7 @@ export function useGoGame(
         consecutivePasses: 0,
         history: [...prev.history, serializeBoard(nextBoard)],
         lastMove: pos,
+        recentMoves: pushRecentMove(prev.recentMoves, pos),
         moveCount,
         lastBomb,
       };
@@ -108,6 +116,7 @@ export function useGoGame(
       const consecutivePasses = prev.consecutivePasses + 1;
       const nextPlayer = opponent(prev.currentPlayer);
       const turnIndex = advanceTurn(prev.turnIndex, prev.currentPlayer, prev.teams);
+      const recentMoves = pushRecentMove(prev.recentMoves, null);
 
       if (consecutivePasses >= 2) {
         // Two passes in a row end active play, but the game isn't over yet: players
@@ -119,12 +128,13 @@ export function useGoGame(
           consecutivePasses,
           currentPlayer: nextPlayer,
           turnIndex,
+          recentMoves,
           isScoring: true,
           deadStones: suggestDeadGroups(prev.board, prev.boardSize),
         };
       }
 
-      return { ...prev, consecutivePasses, currentPlayer: nextPlayer, turnIndex };
+      return { ...prev, consecutivePasses, currentPlayer: nextPlayer, turnIndex, recentMoves };
     });
   }, []);
 

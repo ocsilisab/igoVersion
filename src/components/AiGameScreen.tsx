@@ -9,6 +9,12 @@ import ConfirmModal from "./ConfirmModal";
 import GameOverModal from "./GameOverModal";
 import "./GameScreen.css";
 
+const DIFFICULTY_LABELS: Record<AiDifficulty, string> = {
+  facil: "Fácil",
+  dificil: "Difícil",
+  experta: "Experta",
+};
+
 interface AiGameScreenProps {
   boardSize: BoardSize;
   playerColor: Player;
@@ -56,7 +62,7 @@ export default function AiGameScreen({
         <button className="link-button" onClick={onExit}>
           ← Inicio
         </button>
-        <h1 className="game-title">Go · vs IA ({difficulty === "dificil" ? "Difícil" : "Fácil"})</h1>
+        <h1 className="game-title">Go · vs IA ({DIFFICULTY_LABELS[difficulty]})</h1>
         <span className="board-size-label">
           {state.boardSize} × {state.boardSize} · Komi {state.komi}
         </span>

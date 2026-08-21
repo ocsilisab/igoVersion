@@ -75,6 +75,13 @@ export interface GameState {
   deadStones: Set<string>;
   gameOver: boolean;
   lastMove: Position | null;
+  /**
+   * Most-recent-first, capped at 3 entries: the last 3 plies (stone placement or pass,
+   * `null` for either "that ply was a pass" or "the game hasn't reached that far back
+   * yet"). Feeds the neural AI's recent-move context channels (ai-service's
+   * game_adapter.py expects exactly this shape) — nothing else in the app reads it.
+   */
+  recentMoves: (Position | null)[];
   winner: Player | "draw" | null;
   score: ScoreResult | null;
 }
@@ -84,10 +91,11 @@ export type GameMode = "solo" | "ai" | "online";
 
 /**
  * AI opponent strength for "Jugar con IA". "facil" is the reactive one-ply heuristic in
- * src/ai/chooseMove.ts; "dificil" is meant to route to a Monte Carlo Tree Search engine
- * (src/ai/mcts/) with real lookahead, planned in phases — until that lands, both
- * difficulties call the same chooseAiMove, so this type is wired up ahead of the engine.
+ * src/ai/chooseMove.ts. "dificil" runs Monte Carlo Tree Search (src/ai/mcts/) with real
+ * lookahead. "experta" calls the PyTorch policy network in ai-service/ over HTTP (see
+ * src/ai/neural/chooseNeuralMove.ts) — only available on a 19x19 board, since that's the
+ * only size the model was trained for, and only when that local service is reachable.
  */
-export type AiDifficulty = "facil" | "dificil";
+export type AiDifficulty = "facil" | "dificil" | "experta";
 
 export const DEFAULT_AI_DIFFICULTY: AiDifficulty = "facil";

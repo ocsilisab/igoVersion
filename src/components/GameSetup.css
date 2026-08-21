@@ -61,6 +61,15 @@
   border-color: var(--text-muted);
 }
 
+.setup-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.setup-option:disabled:hover {
+  border-color: var(--border);
+}
+
 .setup-option-active {
   border-color: var(--accent);
   background: var(--accent-bg, rgba(47, 111, 82, 0.1));

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AiDifficulty, BoardSize, ExtensionRules, Player } from "../types/game";
 import { DEFAULT_AI_DIFFICULTY, DEFAULT_KOMI, MAX_TOTAL_PLAYERS, NO_EXTENSIONS } from "../types/game";
+import { checkNeuralServiceHealth, NEURAL_AI_BOARD_SIZE } from "../ai/neural/chooseNeuralMove";
 import KomiSelector from "./KomiSelector";
 import PlayerRoster from "./PlayerRoster";
 import ExtensionsSelector from "./ExtensionsSelector";
@@ -24,6 +25,7 @@ const MAX_HUMAN_PLAYERS = MAX_TOTAL_PLAYERS - 1; // the AI always takes one seat
 const DIFFICULTIES: { value: AiDifficulty; label: string }[] = [
   { value: "facil", label: "Fácil" },
   { value: "dificil", label: "Difícil" },
+  { value: "experta", label: "Experta" },
 ];
 
 export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
@@ -33,6 +35,24 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
   const [humanNames, setHumanNames] = useState<string[]>(["Jugador 1"]);
   const [extensions, setExtensions] = useState<ExtensionRules>(NO_EXTENSIONS);
   const [difficulty, setDifficulty] = useState<AiDifficulty>(DEFAULT_AI_DIFFICULTY);
+  const [expertaAvailable, setExpertaAvailable] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    checkNeuralServiceHealth().then((available) => {
+      if (!cancelled) setExpertaAvailable(available);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleBoardSizeChange = (size: BoardSize) => {
+    setBoardSize(size);
+    if (difficulty === "experta" && size !== NEURAL_AI_BOARD_SIZE) {
+      setDifficulty(DEFAULT_AI_DIFFICULTY);
+    }
+  };
 
   return (
     <div className="setup-screen">
@@ -51,7 +71,7 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
               <button
                 key={size}
                 className={`setup-option ${boardSize === size ? "setup-option-active" : ""}`}
-                onClick={() => setBoardSize(size)}
+                onClick={() => handleBoardSizeChange(size)}
               >
                 {size} × {size}
               </button>
@@ -89,16 +109,29 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
         <section className="setup-section">
           <h2>Dificultad de la IA</h2>
           <div className="setup-options">
-            {DIFFICULTIES.map((option) => (
-              <button
-                key={option.value}
-                className={`setup-option ${difficulty === option.value ? "setup-option-active" : ""}`}
-                onClick={() => setDifficulty(option.value)}
-              >
-                {option.label}
-              </button>
-            ))}
+            {DIFFICULTIES.filter((option) => option.value !== "experta" || boardSize === NEURAL_AI_BOARD_SIZE).map(
+              (option) => {
+                const disabled = option.value === "experta" && !expertaAvailable;
+                return (
+                  <button
+                    key={option.value}
+                    className={`setup-option ${difficulty === option.value ? "setup-option-active" : ""}`}
+                    onClick={() => setDifficulty(option.value)}
+                    disabled={disabled}
+                    title={disabled ? "Servicio de IA neuronal no disponible (ai-service/) — arráncalo en local para usar esta opción." : undefined}
+                  >
+                    {option.label}
+                  </button>
+                );
+              }
+            )}
           </div>
+          {boardSize === NEURAL_AI_BOARD_SIZE && !expertaAvailable && (
+            <p className="setup-hint">
+              "Experta" (red neuronal entrenada con partidas profesionales) requiere el servicio local de
+              ai-service/ en marcha.
+            </p>
+          )}
         </section>
 
         <KomiSelector komi={komi} onSelect={setKomi} />

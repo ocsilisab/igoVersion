@@ -5,6 +5,7 @@ import { useGoGame } from "./useGoGame";
 import { useMctsWorker } from "./useMctsWorker";
 import { chooseAiMove } from "../ai/chooseMove";
 import { mctsTimeBudgetMs } from "../ai/mcts/chooseMctsMove";
+import { chooseNeuralMove } from "../ai/neural/chooseNeuralMove";
 
 const AI_MIN_THINK_MS = 500;
 const AI_MAX_THINK_MS = 1000;
@@ -20,7 +21,9 @@ const AI_ROSTER = ["IA"];
  * "Fácil" (ai/chooseMove.ts) is synchronous and near-instant, so it runs on the main
  * thread behind a short cosmetic "thinking" delay. "Difícil" (ai/mcts/) runs a real,
  * multi-second search — see useMctsWorker.ts — inside a Web Worker, so that search never
- * blocks the UI thread the way it did before Fase 3.
+ * blocks the UI thread the way it did before Fase 3. "Experta" (ai/neural/) calls the
+ * standalone Python inference service over HTTP and falls back to "Fácil" if that
+ * request fails for any reason (service not running, network error, etc.).
  */
 export function useAiGoGame(
   initialSize: BoardSize,
@@ -69,6 +72,24 @@ export function useAiGoGame(
         },
         mctsTimeBudgetMs(state.boardSize)
       ).then(finish);
+
+      return () => {
+        cancelled = true;
+        isThinkingRef.current = false;
+        setIsAiThinking(false);
+      };
+    }
+
+    if (difficulty === "experta") {
+      chooseNeuralMove(state, aiColor)
+        .catch((error) => {
+          // The neural service is a separate local process the developer has to start
+          // themselves — if it's down or a single request fails, fall back to "facil"
+          // rather than stalling the game on an AI turn that will never resolve.
+          console.warn("IA neuronal no disponible, usando la IA facil para esta jugada:", error);
+          return chooseAiMove(state, aiColor);
+        })
+        .then(finish);
 
       return () => {
         cancelled = true;
