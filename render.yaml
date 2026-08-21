@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: igo-ai-service
+    runtime: docker
+    plan: free
+    dockerfilePath: ./ai-service/Dockerfile
+    dockerContext: ./ai-service
+    healthCheckPath: /health
