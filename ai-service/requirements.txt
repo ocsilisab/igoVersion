@@ -1,0 +1,9 @@
+torch>=2.7
+numpy
+pyyaml
+pytest
+sgfmill
+py7zr
+fastapi
+uvicorn[standard]
+httpx

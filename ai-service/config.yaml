@@ -1,0 +1,34 @@
+# Configuracion del servicio de IA neuronal (Policy Network).
+# board_size esta fijado a 19: es el unico tamano soportado en v1 (ver analisis de Fase 1),
+# y coincide con el tamano en el que se juegan casi todas las partidas 7d-9d del dataset.
+
+dataset:
+  source: "https://github.com/featurecat/go-dataset"
+  ranks:
+    - "7d"
+    - "8d"
+    - "9d"
+  max_games: 100000
+  max_positions_per_game: 60
+  board_size: 19
+
+model:
+  board_size: 19
+  input_channels: 6
+  residual_channels: 64
+  residual_blocks: 6
+  num_labels: 362 # 19*19 + 1 pase
+
+training:
+  # batch_size 32 (spec's suggested default) left the RTX 5060 at ~28% utilization and
+  # projected a ~15.4h run against the <12h target; measured on the real 5.35M-sample
+  # dataset, batch_size 256 pushes GPU utilization to ~88% (still <1GB/8GB VRAM) at
+  # ~12,500 samples/s, projecting ~3.75h for all 30 epochs.
+  batch_size: 256
+  epochs: 30
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  mixed_precision: true
+  early_stopping:
+    enabled: true
+    patience: 5

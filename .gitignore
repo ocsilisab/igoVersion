@@ -18,6 +18,16 @@ dist-ssr
 !.env.example
 .vercel
 
+# AI service (Python): venv, downloaded dataset, and trained weights never get committed
+ai-service/.venv
+ai-service/data/*
+!ai-service/data/.gitkeep
+ai-service/checkpoints/*
+!ai-service/checkpoints/.gitkeep
+ai-service/__pycache__
+ai-service/**/__pycache__
+ai-service/.pytest_cache
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
