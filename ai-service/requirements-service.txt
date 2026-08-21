@@ -1,0 +1,8 @@
+# Runtime-only dependencies for src/service.py (the deployed inference API) -- deliberately
+# excludes sgfmill/py7zr/pytest/pyyaml, which are only needed for dataset prep/training/tests
+# (see requirements.txt). Kept separate so the Docker image built from this file stays small
+# and doesn't need a GPU: CPU-only torch is enough for inference on a ~1.5M-parameter model.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.7
+fastapi
+uvicorn[standard]
