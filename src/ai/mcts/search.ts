@@ -1,6 +1,7 @@
 import type { Board, BoardSize, Player, Position } from "../../types/game.js";
 import { opponent } from "../../utils/board.js";
 import { tryMove } from "../../utils/move.js";
+import { isGameEffectivelyOver, type EndgameCandidate } from "../detectGameEnd.js";
 import type { MctsMove, MctsNode } from "./node.js";
 import { isTerminal, advanceHistory } from "./node.js";
 import { uctScore } from "./uct.js";
@@ -134,13 +135,43 @@ function backpropagate(node: MctsNode, winner: Player | "draw"): void {
 }
 
 /**
+ * Every legal board move available to `state.toMove` right now, in the shape
+ * isGameEffectivelyOver expects. Used only for the pre-search endgame check below — the
+ * search tree itself still discovers and tries these moves on its own via legalMovesFrom.
+ */
+function rootCandidateMoves(state: MctsRootState): EndgameCandidate[] {
+  const { board, boardSize, toMove, history } = state;
+  const candidates: EndgameCandidate[] = [];
+
+  for (let row = 0; row < boardSize; row++) {
+    for (let col = 0; col < boardSize; col++) {
+      if (board[row][col] !== null) continue;
+      const result = tryMove(board, boardSize, toMove, { row, col }, history);
+      if (result.ok) candidates.push({ capturedCount: result.capturedCount, resultingBoard: result.board });
+    }
+  }
+
+  return candidates;
+}
+
+/**
  * Runs UCT Monte Carlo Tree Search for up to `timeBudgetMs`, then returns the root move
  * that was visited the most — the standard "robust child" choice (more stable than
  * picking the highest raw win rate, which can be misleadingly high from very few tries).
  * Returns null to recommend a pass. The time budget alone is what tunes strength: more
  * time → more simulations → a better-informed choice, with no other code changes needed.
+ *
+ * Before spending any time searching, this also checks isGameEffectivelyOver: with area
+ * scoring, a settled endgame position has many close-to-equal filler moves (dame, self-fill)
+ * competing with the single "pass" option for visits, so UCT's "most visited" pick can favor
+ * one of those fillers over pass by sheer numbers even when they're all tied in value — this
+ * pre-check passes correctly regardless of how that vote would have split.
  */
 export function runMcts(state: MctsRootState, timeBudgetMs: number): Position | null {
+  if (isGameEffectivelyOver(state.board, state.boardSize, state.komi, state.toMove, rootCandidateMoves(state))) {
+    return null;
+  }
+
   const root = buildSearchTree(state, timeBudgetMs);
   return bestMoveFrom(root);
 }

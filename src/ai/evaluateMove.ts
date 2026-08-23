@@ -1,4 +1,4 @@
-import type { Board, BoardSize, GameState, Player, Position } from "../types/game";
+import type { BoardSize, GameState, Player, Position } from "../types/game";
 import { getNeighbors, opponent, posKey } from "../utils/board";
 import { getGroup } from "../utils/liberties";
 import type { ValidAiMove } from "./getValidMoves";
@@ -158,15 +158,4 @@ export function evaluateMove(move: ValidAiMove, aiColor: Player, ctx: AiEvalCont
 export function evaluateMoves(gameState: GameState, aiColor: Player, moves: ValidAiMove[]): { move: ValidAiMove; score: number }[] {
   const ctx = buildEvalContext(gameState, aiColor);
   return moves.map((move) => ({ move, score: evaluateMove(move, aiColor, ctx) }));
-}
-
-// Exposed for chooseMove's advanced-game "nothing useful to do" pass heuristic.
-export function countStones(board: Board): number {
-  let count = 0;
-  for (const row of board) {
-    for (const cell of row) {
-      if (cell !== null) count++;
-    }
-  }
-  return count;
 }
