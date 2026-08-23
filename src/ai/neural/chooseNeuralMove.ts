@@ -22,9 +22,14 @@ interface MoveResponseBody {
   top_moves: { move: Position | null; probability: number }[];
 }
 
-/** Cheap reachability probe — GameSetup.tsx uses this to decide whether to offer
- * "Experta" at all, instead of only failing once the game has already started. */
-export async function checkNeuralServiceHealth(timeoutMs = 1500): Promise<boolean> {
+/**
+ * Reachability probe — GameSetup.tsx uses this to decide whether to offer "Experta" at
+ * all, instead of only failing once the game has already started. The default timeout is
+ * long enough to cover a cold start on Render's free tier (the service spins down after
+ * ~15 minutes idle and can take 30-50s to wake back up on the next request) — a short
+ * timeout here would report "unavailable" for a service that's simply still waking up.
+ */
+export async function checkNeuralServiceHealth(timeoutMs = 60_000): Promise<boolean> {
   try {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);

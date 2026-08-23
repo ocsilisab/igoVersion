@@ -35,17 +35,23 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
   const [humanNames, setHumanNames] = useState<string[]>(["Jugador 1"]);
   const [extensions, setExtensions] = useState<ExtensionRules>(NO_EXTENSIONS);
   const [difficulty, setDifficulty] = useState<AiDifficulty>(DEFAULT_AI_DIFFICULTY);
-  const [expertaAvailable, setExpertaAvailable] = useState(false);
+  const [expertaStatus, setExpertaStatus] = useState<"checking" | "available" | "unavailable">("checking");
+  const [expertaCheckAttempt, setExpertaCheckAttempt] = useState(0);
+  const expertaAvailable = expertaStatus === "available";
 
   useEffect(() => {
     let cancelled = false;
+    setExpertaStatus("checking");
+    // Can take up to ~50s on a cold Render instance — see checkNeuralServiceHealth's
+    // default timeout — so the setup screen shows a "comprobando" state meanwhile instead
+    // of immediately (and incorrectly) reporting "Experta" as unavailable.
     checkNeuralServiceHealth().then((available) => {
-      if (!cancelled) setExpertaAvailable(available);
+      if (!cancelled) setExpertaStatus(available ? "available" : "unavailable");
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [expertaCheckAttempt]);
 
   const handleBoardSizeChange = (size: BoardSize) => {
     setBoardSize(size);
@@ -112,13 +118,19 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
             {DIFFICULTIES.filter((option) => option.value !== "experta" || boardSize === NEURAL_AI_BOARD_SIZE).map(
               (option) => {
                 const disabled = option.value === "experta" && !expertaAvailable;
+                const title =
+                  option.value === "experta" && expertaStatus === "checking"
+                    ? "Comprobando disponibilidad del servicio de IA…"
+                    : option.value === "experta" && expertaStatus === "unavailable"
+                      ? "Servicio de IA neuronal no disponible ahora mismo."
+                      : undefined;
                 return (
                   <button
                     key={option.value}
                     className={`setup-option ${difficulty === option.value ? "setup-option-active" : ""}`}
                     onClick={() => setDifficulty(option.value)}
                     disabled={disabled}
-                    title={disabled ? "Servicio de IA neuronal no disponible (ai-service/) — arráncalo en local para usar esta opción." : undefined}
+                    title={title}
                   >
                     {option.label}
                   </button>
@@ -126,10 +138,18 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
               }
             )}
           </div>
-          {boardSize === NEURAL_AI_BOARD_SIZE && !expertaAvailable && (
+          {boardSize === NEURAL_AI_BOARD_SIZE && expertaStatus === "checking" && (
             <p className="setup-hint">
-              "Experta" (red neuronal entrenada con partidas profesionales) requiere el servicio local de
-              ai-service/ en marcha.
+              Comprobando si "Experta" está disponible… puede tardar hasta un minuto si el servicio llevaba un
+              rato sin usarse.
+            </p>
+          )}
+          {boardSize === NEURAL_AI_BOARD_SIZE && expertaStatus === "unavailable" && (
+            <p className="setup-hint">
+              "Experta" (red neuronal entrenada con partidas profesionales) no está disponible ahora mismo.{" "}
+              <button className="link-button" onClick={() => setExpertaCheckAttempt((n) => n + 1)}>
+                Reintentar
+              </button>
             </p>
           )}
         </section>
