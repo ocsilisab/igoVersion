@@ -22,14 +22,8 @@ interface MoveResponseBody {
   top_moves: { move: Position | null; probability: number }[];
 }
 
-/**
- * Reachability probe — GameSetup.tsx uses this to decide whether to offer "Experta" at
- * all, instead of only failing once the game has already started. The default timeout is
- * long enough to cover a cold start on Render's free tier (the service spins down after
- * ~15 minutes idle and can take 30-50s to wake back up on the next request) — a short
- * timeout here would report "unavailable" for a service that's simply still waking up.
- */
-export async function checkNeuralServiceHealth(timeoutMs = 60_000): Promise<boolean> {
+/** One fetch attempt against /health, with its own timeout. Never throws. */
+async function probeOnce(timeoutMs: number): Promise<boolean> {
   try {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
@@ -40,6 +34,29 @@ export async function checkNeuralServiceHealth(timeoutMs = 60_000): Promise<bool
     return body.model_loaded === true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Reachability probe — GameSetup.tsx uses this to decide whether to offer "Experta" at
+ * all, instead of only failing once the game has already started.
+ *
+ * Retries several shorter attempts instead of holding one single long-lived connection
+ * open: a cold start on Render's free tier (the service spins down after ~15 minutes idle
+ * and can take 30-50s to wake back up) needs *some* request to eventually get through, but
+ * a single fetch held open for the full wait is exactly the shape of request some mobile
+ * networks and carrier proxies silently kill after 20-30s of apparent inactivity — killing
+ * it right as the cold dyno was about to answer. Re-issuing a fresh short-lived request
+ * every few seconds gives every attempt a real chance to land in a mobile browser too, and
+ * costs nothing extra once the service is already warm (the very first attempt succeeds).
+ */
+export async function checkNeuralServiceHealth(totalBudgetMs = 75_000, attemptTimeoutMs = 8_000): Promise<boolean> {
+  const deadline = Date.now() + totalBudgetMs;
+
+  while (true) {
+    if (await probeOnce(attemptTimeoutMs)) return true;
+    if (Date.now() >= deadline) return false;
+    await new Promise((resolve) => window.setTimeout(resolve, 2_000));
   }
 }
 
