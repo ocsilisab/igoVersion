@@ -7,6 +7,7 @@ from src.adapters.game_adapter import (
     NUM_LABELS,
     PASS_LABEL,
     GameStateInput,
+    embed_in_canvas,
     encode_position,
     game_state_from_json,
     label_to_move,
@@ -137,3 +138,36 @@ def test_game_state_from_json_defaults_recent_moves_to_empty():
     payload = {"board": empty_board(), "board_size": BOARD_SIZE, "current_player": "black"}
     state = game_state_from_json(payload)
     assert state.recent_moves == []
+
+
+def test_embed_in_canvas_leaves_a_19x19_state_untouched():
+    state = GameStateInput(board=empty_board(), board_size=BOARD_SIZE, current_player="black")
+    assert embed_in_canvas(state) is state
+
+
+def test_embed_in_canvas_places_smaller_board_in_top_left_corner():
+    small_board = [[None] * 9 for _ in range(9)]
+    small_board[0][0] = "black"
+    small_board[8][8] = "white"
+    state = GameStateInput(board=small_board, board_size=9, current_player="white", recent_moves=[(8, 8)])
+
+    canvas_state = embed_in_canvas(state)
+
+    assert canvas_state.board_size == BOARD_SIZE
+    assert canvas_state.current_player == "white"
+    assert canvas_state.recent_moves == [(8, 8)]  # no offset -- same coordinates
+    assert canvas_state.board[0][0] == "black"
+    assert canvas_state.board[8][8] == "white"
+    # Everything outside the embedded 9x9 corner stays empty.
+    assert canvas_state.board[9][0] is None
+    assert canvas_state.board[0][9] is None
+    assert canvas_state.board[18][18] is None
+
+
+def test_embed_in_canvas_is_a_valid_19x19_input():
+    small_board = [[None] * 13 for _ in range(13)]
+    small_board[5][5] = "black"
+    state = GameStateInput(board=small_board, board_size=13, current_player="black")
+    tensor = encode_position(embed_in_canvas(state))
+    assert tensor.shape == (NUM_CHANNELS, BOARD_SIZE, BOARD_SIZE)
+    assert tensor[0, 5, 5] == 1.0

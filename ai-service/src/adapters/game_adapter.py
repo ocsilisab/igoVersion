@@ -26,6 +26,11 @@ NUM_RECENT_MOVES = 3
 PASS_LABEL = BOARD_SIZE * BOARD_SIZE  # 361
 NUM_LABELS = PASS_LABEL + 1  # 362
 
+# 9x9 and 13x13 are supported at inference time only, via embed_in_canvas below -- the
+# model itself is still the one and only checkpoint trained on 19x19 games; see that
+# function's docstring for why this is the only way to run it on a smaller board at all.
+SUPPORTED_BOARD_SIZES = (9, 13, BOARD_SIZE)
+
 
 @dataclass
 class GameStateInput:
@@ -93,6 +98,37 @@ def label_to_move(label: int, board_size: int = BOARD_SIZE) -> Optional[Position
     if label == pass_label:
         return None
     return (label // board_size, label % board_size)
+
+
+def embed_in_canvas(state: GameStateInput) -> GameStateInput:
+    """Places a smaller board's stones in the top-left corner of a full 19x19 canvas, so
+    the trained policy network -- whose final layer (model.py::PolicyNetwork.policy_fc)
+    is a Linear layer sized for exactly board_size=19 and cannot accept any other input
+    shape at all, retrained or not -- can be run on a 9x9 or 13x13 game without
+    retraining. `state.board_size` is returned unchanged (still 9/13); only the encoded
+    tensor sees a 19x19 canvas. If already 19x19, returns `state` as-is.
+
+    This is a best-effort adaptation, not an equivalent one: the model was trained
+    exclusively on full 19x19 professional games, where the whole board is in play from
+    move one. A 9x9 game embedded in one corner, with the rest of the canvas frozen empty
+    for the entire game, looks like nothing in its training data -- expect noticeably
+    weaker play than on 19x19, not just "the same model, smaller board."
+    """
+    if state.board_size == BOARD_SIZE:
+        return state
+
+    canvas: Board = [[None] * BOARD_SIZE for _ in range(BOARD_SIZE)]
+    for row in range(state.board_size):
+        canvas[row][: state.board_size] = state.board[row]
+
+    return GameStateInput(
+        board=canvas,
+        board_size=BOARD_SIZE,
+        current_player=state.current_player,
+        # Coordinates are unchanged: the corner embedding uses no offset, so a move at
+        # (r, c) on the real board is still at (r, c) on the canvas.
+        recent_moves=state.recent_moves,
+    )
 
 
 def game_state_from_json(data: dict) -> GameStateInput:

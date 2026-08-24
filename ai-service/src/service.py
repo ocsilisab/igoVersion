@@ -19,7 +19,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from src.adapters.game_adapter import BOARD_SIZE, GameStateInput, Player, Stone
+from src.adapters.game_adapter import BOARD_SIZE, SUPPORTED_BOARD_SIZES, GameStateInput, Player, Stone
 from src.inference import predict_move
 from src.model import load_model_from_checkpoint
 
@@ -108,10 +108,10 @@ def ai_move(request: MoveRequest) -> MoveResponse:
             detail=f"Modelo no cargado (no se encontro checkpoint en {_resolve_checkpoint_path()}).",
         )
 
-    if request.board_size != BOARD_SIZE:
+    if request.board_size not in SUPPORTED_BOARD_SIZES:
         raise HTTPException(
             status_code=400,
-            detail=f"Este modelo solo soporta board_size={BOARD_SIZE}, se recibio {request.board_size}.",
+            detail=f"board_size soportados: {SUPPORTED_BOARD_SIZES}, se recibio {request.board_size}.",
         )
     if len(request.board) != request.board_size or any(len(row) != request.board_size for row in request.board):
         raise HTTPException(status_code=400, detail="Las dimensiones de 'board' no coinciden con board_size.")

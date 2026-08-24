@@ -1,3 +1,4 @@
+import pytest
 import torch
 
 from src.adapters.game_adapter import BOARD_SIZE, GameStateInput
@@ -56,3 +57,36 @@ def test_predict_move_json_shape_uses_row_col_or_none_for_pass():
     for scored in result["top_moves"]:
         move = scored["move"]
         assert move is None or (isinstance(move, dict) and set(move.keys()) == {"row", "col"})
+
+
+@pytest.mark.parametrize("board_size", [9, 13])
+def test_predict_move_on_smaller_board_stays_within_bounds(board_size):
+    # The one 19x19-trained model, run via embed_in_canvas -- every suggested move must
+    # still land inside the *real* (smaller) board, never in the empty padding.
+    model = tiny_model()
+    state = GameStateInput(board=empty_board(board_size), board_size=board_size, current_player="black")
+    result = predict_move(model, state, history=[], device=torch.device("cpu"), top_n=10)
+    for scored in result["top_moves"]:
+        move = scored["move"]
+        if move is not None:
+            assert 0 <= move["row"] < board_size
+            assert 0 <= move["col"] < board_size
+
+
+def test_predict_move_on_smaller_board_never_suggests_an_occupied_point():
+    model = tiny_model()
+    board_size = 9
+    board = empty_board(board_size)
+    for row in range(board_size):
+        for col in range(board_size):
+            board[row][col] = "black" if (row + col) % 2 == 0 else "white"
+    board[4][4] = None
+    board[4][5] = None
+
+    state = GameStateInput(board=board, board_size=board_size, current_player="black")
+    result = predict_move(model, state, history=[], device=torch.device("cpu"), top_n=5)
+
+    for scored in result["top_moves"]:
+        move = scored["move"]
+        if move is not None:
+            assert board[move["row"]][move["col"]] is None

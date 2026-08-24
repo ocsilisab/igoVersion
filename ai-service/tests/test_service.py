@@ -50,7 +50,7 @@ def test_ai_move_returns_a_legal_move_on_empty_board(client):
     assert move is None or (0 <= move["row"] < BOARD_SIZE and 0 <= move["col"] < BOARD_SIZE)
 
 
-def test_ai_move_rejects_wrong_board_size(client):
+def test_ai_move_rejects_unsupported_board_size(client):
     health = client.get("/health").json()
     if not health["model_loaded"]:
         pytest.skip("No hay checkpoint entrenado disponible en este entorno.")
@@ -58,14 +58,40 @@ def test_ai_move_rejects_wrong_board_size(client):
     response = client.post(
         "/ai/move",
         json={
-            "board": [[None] * 9 for _ in range(9)],
-            "board_size": 9,
+            "board": [[None] * 5 for _ in range(5)],
+            "board_size": 5,
             "current_player": "black",
             "recent_moves": [],
             "history": [],
         },
     )
     assert response.status_code == 400
+
+
+@pytest.mark.parametrize("board_size", [9, 13])
+def test_ai_move_accepts_smaller_board_sizes(client, board_size):
+    # 9x9 and 13x13 run via embed_in_canvas (see game_adapter.py) rather than a
+    # dedicated model -- there's only ever the one 19x19-trained checkpoint.
+    health = client.get("/health").json()
+    if not health["model_loaded"]:
+        pytest.skip("No hay checkpoint entrenado disponible en este entorno.")
+
+    response = client.post(
+        "/ai/move",
+        json={
+            "board": [[None] * board_size for _ in range(board_size)],
+            "board_size": board_size,
+            "current_player": "black",
+            "recent_moves": [],
+            "history": [],
+            "top_n": 5,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    for scored in body["top_moves"]:
+        move = scored["move"]
+        assert move is None or (0 <= move["row"] < board_size and 0 <= move["col"] < board_size)
 
 
 def test_ai_move_never_suggests_an_occupied_point(client):

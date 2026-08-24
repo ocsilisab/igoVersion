@@ -1,4 +1,4 @@
-import type { GameState, Player, Position } from "../../types/game.js";
+import type { BoardSize, GameState, Player, Position } from "../../types/game.js";
 import { getValidMoves } from "../getValidMoves.js";
 import { isGameEffectivelyOver } from "../detectGameEnd.js";
 
@@ -7,9 +7,18 @@ import { isGameEffectivelyOver } from "../detectGameEnd.js";
  * src/service.py) — a PyTorch policy network trained on 7-9 dan games. Unlike the local
  * "facil" heuristic and the in-browser "dificil" MCTS worker, this AI runs as a separate
  * process the developer starts themselves (`uvicorn src.service:app`); the app never
- * bundles or loads PyTorch. Only trained for 19x19 boards — see NEURAL_AI_BOARD_SIZE.
+ * bundles or loads PyTorch.
+ *
+ * There is only ever the one checkpoint, trained on 19x19 games. 9x9 and 13x13 run via
+ * the service's embed_in_canvas (see ai-service/src/adapters/game_adapter.py): the
+ * smaller board is placed in a corner of a virtual 19x19 canvas before being handed to
+ * the same model, since its final layer is sized for exactly 19x19 and can't accept any
+ * other input shape at all. This is a best-effort adaptation, not an equivalent one — the
+ * model has never seen a real 9x9/13x13 game (everything it learned came from full-board
+ * 19x19 professional games), so expect visibly weaker play on the smaller sizes than on
+ * 19x19 itself.
  */
-export const NEURAL_AI_BOARD_SIZE = 19;
+export const NEURAL_AI_SUPPORTED_BOARD_SIZES: readonly BoardSize[] = [9, 13, 19];
 
 const DEFAULT_SERVICE_URL = "http://localhost:8000";
 
@@ -76,8 +85,8 @@ export async function checkNeuralServiceHealth(totalBudgetMs = 75_000, attemptTi
  * skips an unnecessary request to the (possibly cold) hosted service in that case too.
  */
 export async function chooseNeuralMove(gameState: GameState, aiColor: Player): Promise<Position | null> {
-  if (gameState.boardSize !== NEURAL_AI_BOARD_SIZE) {
-    throw new Error(`El servicio de IA neuronal solo soporta tableros de ${NEURAL_AI_BOARD_SIZE}x${NEURAL_AI_BOARD_SIZE}.`);
+  if (!NEURAL_AI_SUPPORTED_BOARD_SIZES.includes(gameState.boardSize)) {
+    throw new Error(`El servicio de IA neuronal no soporta tableros de ${gameState.boardSize}x${gameState.boardSize}.`);
   }
 
   const moves = getValidMoves(gameState, aiColor);

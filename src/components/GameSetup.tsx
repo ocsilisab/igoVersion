@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { AiDifficulty, BoardSize, ExtensionRules, Player } from "../types/game";
 import { DEFAULT_AI_DIFFICULTY, DEFAULT_KOMI, MAX_TOTAL_PLAYERS, NO_EXTENSIONS } from "../types/game";
-import { checkNeuralServiceHealth, NEURAL_AI_BOARD_SIZE } from "../ai/neural/chooseNeuralMove";
+import { checkNeuralServiceHealth } from "../ai/neural/chooseNeuralMove";
 import KomiSelector from "./KomiSelector";
 import PlayerRoster from "./PlayerRoster";
 import ExtensionsSelector from "./ExtensionsSelector";
@@ -53,13 +53,6 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
     };
   }, [expertaCheckAttempt]);
 
-  const handleBoardSizeChange = (size: BoardSize) => {
-    setBoardSize(size);
-    if (difficulty === "experta" && size !== NEURAL_AI_BOARD_SIZE) {
-      setDifficulty(DEFAULT_AI_DIFFICULTY);
-    }
-  };
-
   return (
     <div className="setup-screen">
       <div className="setup-content">
@@ -77,7 +70,7 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
               <button
                 key={size}
                 className={`setup-option ${boardSize === size ? "setup-option-active" : ""}`}
-                onClick={() => handleBoardSizeChange(size)}
+                onClick={() => setBoardSize(size)}
               >
                 {size} × {size}
               </button>
@@ -115,36 +108,40 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
         <section className="setup-section">
           <h2>Dificultad de la IA</h2>
           <div className="setup-options">
-            {DIFFICULTIES.filter((option) => option.value !== "experta" || boardSize === NEURAL_AI_BOARD_SIZE).map(
-              (option) => {
-                const disabled = option.value === "experta" && !expertaAvailable;
-                const title =
-                  option.value === "experta" && expertaStatus === "checking"
-                    ? "Comprobando disponibilidad del servicio de IA…"
-                    : option.value === "experta" && expertaStatus === "unavailable"
-                      ? "Servicio de IA neuronal no disponible ahora mismo."
-                      : undefined;
-                return (
-                  <button
-                    key={option.value}
-                    className={`setup-option ${difficulty === option.value ? "setup-option-active" : ""}`}
-                    onClick={() => setDifficulty(option.value)}
-                    disabled={disabled}
-                    title={title}
-                  >
-                    {option.label}
-                  </button>
-                );
-              }
-            )}
+            {DIFFICULTIES.map((option) => {
+              const disabled = option.value === "experta" && !expertaAvailable;
+              const title =
+                option.value === "experta" && expertaStatus === "checking"
+                  ? "Comprobando disponibilidad del servicio de IA…"
+                  : option.value === "experta" && expertaStatus === "unavailable"
+                    ? "Servicio de IA neuronal no disponible ahora mismo."
+                    : undefined;
+              return (
+                <button
+                  key={option.value}
+                  className={`setup-option ${difficulty === option.value ? "setup-option-active" : ""}`}
+                  onClick={() => setDifficulty(option.value)}
+                  disabled={disabled}
+                  title={title}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
           </div>
-          {boardSize === NEURAL_AI_BOARD_SIZE && expertaStatus === "checking" && (
+          {difficulty === "experta" && boardSize !== 19 && (
+            <p className="setup-hint">
+              En 9×9/13×13 "Experta" usa el mismo modelo de 19×19 adaptado a un tablero más pequeño — juega
+              notablemente peor que en 19×19, donde sí fue entrenada.
+            </p>
+          )}
+          {expertaStatus === "checking" && (
             <p className="setup-hint">
               Comprobando si "Experta" está disponible… puede tardar hasta un minuto si el servicio llevaba un
               rato sin usarse.
             </p>
           )}
-          {boardSize === NEURAL_AI_BOARD_SIZE && expertaStatus === "unavailable" && (
+          {expertaStatus === "unavailable" && (
             <p className="setup-hint">
               "Experta" (red neuronal entrenada con partidas profesionales) no está disponible ahora mismo.{" "}
               <button className="link-button" onClick={() => setExpertaCheckAttempt((n) => n + 1)}>
