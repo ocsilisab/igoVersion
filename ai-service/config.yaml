@@ -4,11 +4,25 @@
 
 dataset:
   source: "https://github.com/featurecat/go-dataset"
+  # max_games raised from 100000 to 400000: v1 only ever consumed a slice of 7d, since
+  # ranks are pulled in order and it hit the old cap before ever reaching 8d/9d. All three
+  # ranks combined are already downloaded locally (~369k games) -- this comfortably covers
+  # all of them without a new download.
+  #
+  # Teaching "pass" was also attempted here by additionally sourcing lower (kyu) ranks
+  # filtered to games with a real pass move, but that turned out to be a dead end: a check
+  # across ~28k parsed games spanning 9d down to 3k found *zero* with an explicit pass in
+  # the SGF, even games that ended by real score (RE[W+18.0] etc.) rather than resignation
+  # -- this dataset's exporting Go server just stops the move list at the last stone
+  # placed and records the result as metadata, never as a pass move. No rank choice fixes
+  # that. "Experta" instead defers to the same rule-based endgame check the heuristic AIs
+  # use (see src/ai/detectGameEnd.ts, wired in via ai/neural/chooseNeuralMove.ts) to decide
+  # when to pass, since the policy network structurally cannot learn it from this data.
   ranks:
     - "7d"
     - "8d"
     - "9d"
-  max_games: 100000
+  max_games: 400000
   max_positions_per_game: 60
   board_size: 19
 

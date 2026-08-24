@@ -2,7 +2,7 @@ from pathlib import Path
 
 import torch
 
-from src.adapters.game_adapter import BOARD_SIZE, GameStateInput, encode_position, move_to_label
+from src.adapters.game_adapter import BOARD_SIZE, PASS_LABEL, GameStateInput, encode_position, move_to_label
 from src.go_board import empty_board
 from src.preprocessing import (
     RawSample,
@@ -70,6 +70,28 @@ def test_iter_game_samples_respects_cap_via_even_subsampling():
     )
     samples = list(iter_game_samples(game, max_positions_per_game=10))
     assert len(samples) == 10
+
+
+def test_iter_game_samples_always_includes_trailing_pass_even_if_undersampled():
+    # 50 real moves, evenly-spaced sampling capped at 10 would only look at every ~5th
+    # ply and never reach all the way to the very last one -- but the game's final ply is
+    # a pass, and that position must still show up as a training sample regardless.
+    moves = [("black" if i % 2 == 0 else "white", (i % 19, 0)) for i in range(50)]
+    moves.append(("black" if len(moves) % 2 == 0 else "white", None))
+    game = ParsedGame(board_size=BOARD_SIZE, moves=moves)
+
+    samples = list(iter_game_samples(game, max_positions_per_game=10))
+    assert any(s.label == PASS_LABEL for s in samples)
+    assert len(samples) == 11  # the 10 evenly-spaced samples, plus the pass position
+
+
+def test_iter_game_samples_does_not_duplicate_pass_already_in_even_sample():
+    # A short game where the pass naturally falls within the evenly-spaced sample already
+    # -- it must not be double-counted.
+    game = ParsedGame(board_size=BOARD_SIZE, moves=[("black", (0, 0)), ("white", None)])
+    samples = list(iter_game_samples(game, max_positions_per_game=60))
+    assert len(samples) == 2
+    assert samples[1].label == PASS_LABEL
 
 
 def test_decode_sample_to_tensor_matches_direct_encode_position(tmp_path: Path):

@@ -63,7 +63,20 @@ def _sample_indices(total: int, max_samples: int) -> List[int]:
 
 def iter_game_samples(game: ParsedGame, max_positions_per_game: int) -> Iterator[RawSample]:
     """Replays `game` move by move, recording a candidate sample before each ply is
-    applied, then yields an evenly-spaced subset capped at max_positions_per_game."""
+    applied, then yields an evenly-spaced subset capped at max_positions_per_game --
+    plus, unconditionally, every position whose true label is an actual pass.
+
+    Passes would be heavily concentrated in the last 1-2 plies of a game, and
+    evenly-spaced subsampling systematically favors the bulk of a game over its tail (for
+    a typical ~250-move game capped at 60 samples, the last selected index lands several
+    plies before the true end) -- so without this, a game could contain a real pass and
+    still never contribute it as a training example. In practice this dataset's SGF
+    records never encode a pass at all (see Fase X notes: the exporting Go server stops
+    the move list at the last stone placed and records the result as metadata instead,
+    across every rank checked, dan and kyu alike) -- so this is currently a no-op, but a
+    correct and essentially free one, kept in case a future data source does the honest
+    thing and includes them.
+    """
     board = empty_board(game.board_size)
     recent: List[Optional[Position]] = []  # most-recent-first
     candidates: List[RawSample] = []
@@ -80,7 +93,10 @@ def iter_game_samples(game: ParsedGame, max_positions_per_game: int) -> Iterator
         board = apply_move(board, game.board_size, player, move)
         recent = [move] + recent[: NUM_RECENT_MOVES - 1]
 
-    for i in _sample_indices(len(candidates), max_positions_per_game):
+    indices = set(_sample_indices(len(candidates), max_positions_per_game))
+    indices.update(i for i, c in enumerate(candidates) if c.label == PASS_LABEL)
+
+    for i in sorted(indices):
         yield candidates[i]
 
 

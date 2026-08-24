@@ -41,6 +41,28 @@ def sgfmill_point_to_app_position(
     return (board_size - 1 - row, col)
 
 
+def _ends_by_real_score(root) -> bool:
+    """True if the SGF's RE (result) property records an actual scored margin (e.g.
+    "B+3.5", "W+0.0"), as opposed to a resignation ("B+R"/"B+Resign"), a timeout
+    ("W+T"/"W+Time"), a forfeit, or no result at all.
+
+    Every game record in this dataset (see featurecat/go-dataset, checked across ~28k
+    parsed games spanning 9d down to 3k) stops its move list at the last stone placed and
+    records the outcome only as this metadata property -- never as the two consecutive
+    passes that Go's own rules require to reach a scored result. A "+<number>" result is
+    the only signal available that those passes must have happened; parse_sgf_game uses
+    it to add them back in (see below) rather than leave every single game in this
+    dataset looking, to a model, like passing is never correct.
+    """
+    if not root.has_property("RE"):
+        return False
+    result = root.get("RE")
+    if not result or "+" not in result:
+        return False
+    margin = result.split("+", 1)[1].strip()
+    return margin[:1].isdigit()  # "3.5", "0.0", ... — not "R"/"Resign", "T"/"Time", "F"...
+
+
 def parse_sgf_game(raw: bytes) -> Optional[ParsedGame]:
     """Returns None for anything this v1 pipeline deliberately skips: non-19x19
     boards, and handicap games (HA>0 or AB present before move 1) — handicap
@@ -71,5 +93,15 @@ def parse_sgf_game(raw: bytes) -> Optional[ParsedGame]:
         player: Player = "black" if color == "b" else "white"
         position = sgfmill_point_to_app_position(point, board_size)
         moves.append((player, position))
+
+    if moves and moves[-1][1] is not None and _ends_by_real_score(root):
+        # Two consecutive passes, starting with whoever's turn it was after the last
+        # recorded move, is the only way the game could actually have reached a scored
+        # result. Only added when the record doesn't already end in a pass itself (rare,
+        # but it happens) -- that real pass is already exactly what this is trying to add.
+        last_player, _ = moves[-1]
+        other_player: Player = "white" if last_player == "black" else "black"
+        moves.append((other_player, None))
+        moves.append((last_player, None))
 
     return ParsedGame(board_size=board_size, moves=moves)

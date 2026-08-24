@@ -55,6 +55,46 @@ def evaluate_dataset(
     }
 
 
+def evaluate_pass_subset(
+    model: nn.Module, processed_dir: Path, device: torch.device, ks: Sequence[int] = (1, 3, 5)
+) -> Dict[str, float]:
+    """Same top-k accuracy as evaluate_dataset, but restricted to test positions whose
+    true label is actually PASS_LABEL. The overall test accuracy above is dominated by
+    the ~361 board-move labels; passing is a single label among 362, so it needs its own
+    number to see whether the retraining pass (adding synthetic pass moves for
+    real-scored games -- see sgf_utils.py::_ends_by_real_score) actually worked, rather
+    than being invisible in an aggregate that barely samples it either way."""
+    model.eval()
+    correct = {k: 0 for k in ks}
+    total = 0
+    total_pass_probability = 0.0  # softmax mass on "pass", summed, for computing an average
+
+    shard_paths = sorted((processed_dir / "test").glob("shard_*.pt"))
+    with torch.no_grad():
+        for shard_path in shard_paths:
+            shard = torch.load(shard_path, weights_only=True)
+            labels = shard["label"]
+            pass_indices = (labels == PASS_LABEL).nonzero(as_tuple=True)[0].tolist()
+            if not pass_indices:
+                continue
+
+            tensors = torch.stack([decode_sample_to_tensor(shard, i)[0] for i in pass_indices]).to(device)
+            logits = model(tensors)
+            probs = torch.softmax(logits, dim=1)
+            total_pass_probability += probs[:, PASS_LABEL].sum().item()
+
+            batch_labels = torch.full((len(pass_indices),), PASS_LABEL, device=device)
+            for k in ks:
+                correct[k] += topk_correct(logits, batch_labels, k)
+            total += len(pass_indices)
+
+    return {
+        "count": total,
+        "avg_pass_probability": total_pass_probability / max(total, 1),
+        **{f"top{k}_accuracy": correct[k] / max(total, 1) for k in ks},
+    }
+
+
 def format_move(label: int, board_size: int) -> str:
     move = label_to_move(label, board_size)
     if move is None:
@@ -152,6 +192,15 @@ def main() -> None:
         f"top1={metrics['top1_accuracy'] * 100:.2f}%  "
         f"top3={metrics['top3_accuracy'] * 100:.2f}%  "
         f"top5={metrics['top5_accuracy'] * 100:.2f}%"
+    )
+
+    pass_metrics = evaluate_pass_subset(model, processed_dir, device)
+    print(
+        f"\n=== Subconjunto 'pase' del test ({pass_metrics['count']:,} posiciones) ===\n"
+        f"top1={pass_metrics['top1_accuracy'] * 100:.2f}%  "
+        f"top3={pass_metrics['top3_accuracy'] * 100:.2f}%  "
+        f"top5={pass_metrics['top5_accuracy'] * 100:.2f}%  "
+        f"prob_media_asignada_a_pase={pass_metrics['avg_pass_probability'] * 100:.2f}%"
     )
 
     show_examples(model, processed_dir, device, args.num_examples, board_size)

@@ -1,4 +1,6 @@
 import type { GameState, Player, Position } from "../../types/game.js";
+import { getValidMoves } from "../getValidMoves.js";
+import { isGameEffectivelyOver } from "../detectGameEnd.js";
 
 /**
  * HTTP client for the standalone Python inference service (ai-service/, see its
@@ -64,10 +66,23 @@ export async function checkNeuralServiceHealth(totalBudgetMs = 75_000, attemptTi
  * Asks the neural service for its top move given the current position. Throws on any
  * network/HTTP failure — useAiGoGame.ts catches this and falls back to the "facil"
  * heuristic so a single unreachable request never stalls the game.
+ *
+ * Before ever calling the network, this defers to the same rule-based endgame check the
+ * heuristic AIs use (see ai/detectGameEnd.ts): the policy network was trained by imitating
+ * professional games, the vast majority of which end by resignation rather than an actual
+ * double pass, so it rarely saw "pass" as the right answer and doesn't reliably predict it
+ * even once the position is fully settled. Running isGameEffectivelyOver first means
+ * "Experta" passes correctly regardless of what the model itself would have guessed, and
+ * skips an unnecessary request to the (possibly cold) hosted service in that case too.
  */
 export async function chooseNeuralMove(gameState: GameState, aiColor: Player): Promise<Position | null> {
   if (gameState.boardSize !== NEURAL_AI_BOARD_SIZE) {
     throw new Error(`El servicio de IA neuronal solo soporta tableros de ${NEURAL_AI_BOARD_SIZE}x${NEURAL_AI_BOARD_SIZE}.`);
+  }
+
+  const moves = getValidMoves(gameState, aiColor);
+  if (isGameEffectivelyOver(gameState.board, gameState.boardSize, gameState.komi, aiColor, moves)) {
+    return null;
   }
 
   const response = await fetch(`${serviceUrl()}/ai/move`, {
