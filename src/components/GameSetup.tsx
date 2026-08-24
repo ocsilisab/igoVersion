@@ -36,6 +36,7 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
   const [extensions, setExtensions] = useState<ExtensionRules>(NO_EXTENSIONS);
   const [difficulty, setDifficulty] = useState<AiDifficulty>(DEFAULT_AI_DIFFICULTY);
   const [expertaStatus, setExpertaStatus] = useState<"checking" | "available" | "unavailable">("checking");
+  const [nativeBoardSizes, setNativeBoardSizes] = useState<readonly BoardSize[]>([]);
   const [expertaCheckAttempt, setExpertaCheckAttempt] = useState(0);
   const expertaAvailable = expertaStatus === "available";
 
@@ -45,8 +46,11 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
     // Can take up to ~50s on a cold Render instance — see checkNeuralServiceHealth's
     // default timeout — so the setup screen shows a "comprobando" state meanwhile instead
     // of immediately (and incorrectly) reporting "Experta" as unavailable.
-    checkNeuralServiceHealth().then((available) => {
-      if (!cancelled) setExpertaStatus(available ? "available" : "unavailable");
+    checkNeuralServiceHealth().then(({ available, nativeBoardSizes }) => {
+      if (!cancelled) {
+        setExpertaStatus(available ? "available" : "unavailable");
+        setNativeBoardSizes(nativeBoardSizes);
+      }
     });
     return () => {
       cancelled = true;
@@ -129,10 +133,10 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
               );
             })}
           </div>
-          {difficulty === "experta" && boardSize !== 19 && (
+          {difficulty === "experta" && expertaStatus === "available" && !nativeBoardSizes.includes(boardSize) && (
             <p className="setup-hint">
-              En 9×9/13×13 "Experta" usa el mismo modelo de 19×19 adaptado a un tablero más pequeño — juega
-              notablemente peor que en 19×19, donde sí fue entrenada.
+              En {boardSize}×{boardSize} "Experta" usa el modelo de 19×19 adaptado a un tablero más pequeño — juega
+              notablemente peor que en un tamaño para el que sí fue entrenada.
             </p>
           )}
           {expertaStatus === "checking" && (

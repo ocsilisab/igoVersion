@@ -9,16 +9,24 @@ import { isGameEffectivelyOver } from "../detectGameEnd.js";
  * process the developer starts themselves (`uvicorn src.service:app`); the app never
  * bundles or loads PyTorch.
  *
- * There is only ever the one checkpoint, trained on 19x19 games. 9x9 and 13x13 run via
- * the service's embed_in_canvas (see ai-service/src/adapters/game_adapter.py): the
- * smaller board is placed in a corner of a virtual 19x19 canvas before being handed to
- * the same model, since its final layer is sized for exactly 19x19 and can't accept any
- * other input shape at all. This is a best-effort adaptation, not an equivalent one — the
- * model has never seen a real 9x9/13x13 game (everything it learned came from full-board
- * 19x19 professional games), so expect visibly weaker play on the smaller sizes than on
- * 19x19 itself.
+ * The service can hold more than one checkpoint at once, keyed by board size (see
+ * service.py's `ModelState.models`). As of writing it has real, natively-trained
+ * checkpoints for 19x19 and 9x9; any size without one (currently 13x13) falls back to
+ * embed_in_canvas (see ai-service/src/adapters/game_adapter.py): the smaller board is
+ * placed in a corner of a virtual 19x19 canvas before being handed to the 19x19 model,
+ * since that model's final layer is sized for exactly 19x19 and can't accept any other
+ * input shape at all. This is a best-effort adaptation, not an equivalent one — the
+ * 19x19 model has never seen a real game at the fallback size, so expect visibly weaker
+ * play there than on a size it was actually trained for. See `checkNeuralServiceHealth`'s
+ * `nativeBoardSizes` for which sizes currently avoid the fallback.
  */
 export const NEURAL_AI_SUPPORTED_BOARD_SIZES: readonly BoardSize[] = [9, 13, 19];
+
+export interface NeuralServiceHealth {
+  available: boolean;
+  /** Board sizes the service currently has a natively-trained checkpoint for. */
+  nativeBoardSizes: readonly BoardSize[];
+}
 
 const DEFAULT_SERVICE_URL = "http://localhost:8000";
 
@@ -34,17 +42,18 @@ interface MoveResponseBody {
 }
 
 /** One fetch attempt against /health, with its own timeout. Never throws. */
-async function probeOnce(timeoutMs: number): Promise<boolean> {
+async function probeOnce(timeoutMs: number): Promise<NeuralServiceHealth | null> {
   try {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), timeoutMs);
     const response = await fetch(`${serviceUrl()}/health`, { signal: controller.signal });
     window.clearTimeout(timer);
-    if (!response.ok) return false;
-    const body = (await response.json()) as { model_loaded?: boolean };
-    return body.model_loaded === true;
+    if (!response.ok) return null;
+    const body = (await response.json()) as { model_loaded?: boolean; models_loaded?: BoardSize[] };
+    if (body.model_loaded !== true) return null;
+    return { available: true, nativeBoardSizes: body.models_loaded ?? [] };
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -61,12 +70,16 @@ async function probeOnce(timeoutMs: number): Promise<boolean> {
  * every few seconds gives every attempt a real chance to land in a mobile browser too, and
  * costs nothing extra once the service is already warm (the very first attempt succeeds).
  */
-export async function checkNeuralServiceHealth(totalBudgetMs = 75_000, attemptTimeoutMs = 8_000): Promise<boolean> {
+export async function checkNeuralServiceHealth(
+  totalBudgetMs = 75_000,
+  attemptTimeoutMs = 8_000
+): Promise<NeuralServiceHealth> {
   const deadline = Date.now() + totalBudgetMs;
 
   while (true) {
-    if (await probeOnce(attemptTimeoutMs)) return true;
-    if (Date.now() >= deadline) return false;
+    const result = await probeOnce(attemptTimeoutMs);
+    if (result) return result;
+    if (Date.now() >= deadline) return { available: false, nativeBoardSizes: [] };
     await new Promise((resolve) => window.setTimeout(resolve, 2_000));
   }
 }
