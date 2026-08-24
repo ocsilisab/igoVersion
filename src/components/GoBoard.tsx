@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import type { Board, BoardSize, Position } from "../types/game";
+import type { Board, BoardSize, Position, ScoreResult } from "../types/game";
 import { posKey } from "../utils/board";
 import { getHoshiPositions } from "../utils/hoshi";
 import "./GoBoard.css";
@@ -19,6 +19,12 @@ interface GoBoardProps {
    */
   deadStones?: Set<string>;
   onToggleDead?: (pos: Position) => void;
+  /**
+   * Score to mark territory from (blackTerritoryPoints/whiteTerritoryPoints), shown as
+   * small colored squares on the relevant empty points. Pass the live `scoringPreview`
+   * while marking dead stones, or the final `score` once the game is over.
+   */
+  score?: ScoreResult | null;
   /** "Bombas" extension: the most recent bomb drop, shown as a marker over its blast radius. */
   lastBomb?: { center: Position; affected: Position[] } | null;
 }
@@ -35,6 +41,7 @@ export default function GoBoard({
   overlayText,
   deadStones,
   onToggleDead,
+  score,
   lastBomb,
 }: GoBoardProps) {
   const isScoringMode = Boolean(onToggleDead);
@@ -42,6 +49,8 @@ export default function GoBoard({
   const coord = (i: number) => MARGIN + i * step;
   const starPoints = getHoshiPositions(boardSize);
   const bombAffectedKeys = new Set((lastBomb?.affected ?? []).map(posKey));
+  const blackTerritoryKeys = new Set((score?.blackTerritoryPoints ?? []).map(posKey));
+  const whiteTerritoryKeys = new Set((score?.whiteTerritoryPoints ?? []).map(posKey));
 
   return (
     <div className="go-board-wrapper">
@@ -75,6 +84,13 @@ export default function GoBoard({
             const isBombAffected = bombAffectedKeys.has(posKey({ row, col }));
             const canPlace = !isScoringMode && !disabled && isEmpty;
             const canToggleDead = isScoringMode && stone !== null;
+            const territoryOwner = isEmpty
+              ? blackTerritoryKeys.has(posKey({ row, col }))
+                ? "black"
+                : whiteTerritoryKeys.has(posKey({ row, col }))
+                  ? "white"
+                  : null
+              : null;
 
             const handleClick = () => {
               if (canToggleDead) onToggleDead!({ row, col });
@@ -96,6 +112,15 @@ export default function GoBoard({
                     cy={cy}
                     r={step * 0.45}
                     className={`stone stone-${stone} ${isDead ? "stone-dead" : ""}`}
+                  />
+                )}
+                {territoryOwner && (
+                  <rect
+                    x={cx - step * 0.18}
+                    y={cy - step * 0.18}
+                    width={step * 0.36}
+                    height={step * 0.36}
+                    className={`territory-marker territory-marker-${territoryOwner}`}
                   />
                 )}
                 {isDead && (

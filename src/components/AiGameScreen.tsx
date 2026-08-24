@@ -98,6 +98,7 @@ export default function AiGameScreen({
         overlayText={isAiThinking ? "La IA está pensando…" : undefined}
         deadStones={state.isScoring || state.gameOver ? state.deadStones : undefined}
         onToggleDead={state.isScoring ? toggleDeadGroup : undefined}
+        score={state.isScoring ? scoringPreview : state.gameOver ? state.score : undefined}
         lastBomb={state.lastBomb}
       />
 

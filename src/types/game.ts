@@ -43,6 +43,9 @@ export interface ScoreResult {
   whiteStones: number;
   blackTerritory: number;
   whiteTerritory: number;
+  /** The empty points making up each color's territory, for the board to mark them visually. */
+  blackTerritoryPoints: Position[];
+  whiteTerritoryPoints: Position[];
   blackCaptures: number;
   whiteCaptures: number;
   komi: number;

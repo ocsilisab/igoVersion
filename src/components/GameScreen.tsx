@@ -66,6 +66,7 @@ export default function GameScreen({ boardSize, komi, teams, extensions = NO_EXT
         disabled={state.gameOver || state.isScoring}
         deadStones={state.isScoring || state.gameOver ? state.deadStones : undefined}
         onToggleDead={state.isScoring ? toggleDeadGroup : undefined}
+        score={state.isScoring ? scoringPreview : state.gameOver ? state.score : undefined}
         lastBomb={state.lastBomb}
       />
 

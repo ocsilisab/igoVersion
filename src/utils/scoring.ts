@@ -77,8 +77,8 @@ export function calculateScore(
 ): ScoreResult {
   let blackStones = 0;
   let whiteStones = 0;
-  let blackTerritory = 0;
-  let whiteTerritory = 0;
+  const blackTerritoryPoints: Position[] = [];
+  const whiteTerritoryPoints: Position[] = [];
   const visited = new Set<string>();
 
   for (let row = 0; row < size; row++) {
@@ -100,12 +100,14 @@ export function calculateScore(
       const { region, borderColors } = floodFillEmptyRegion(board, { row, col }, size, visited);
       if (borderColors.size === 1) {
         const [owner] = borderColors;
-        if (owner === "black") blackTerritory += region.length;
-        else whiteTerritory += region.length;
+        if (owner === "black") blackTerritoryPoints.push(...region);
+        else whiteTerritoryPoints.push(...region);
       }
     }
   }
 
+  const blackTerritory = blackTerritoryPoints.length;
+  const whiteTerritory = whiteTerritoryPoints.length;
   const blackScore = blackStones + blackTerritory + blackCaptures;
   const whiteScore = whiteStones + whiteTerritory + whiteCaptures + komi;
 
@@ -119,6 +121,8 @@ export function calculateScore(
     whiteStones,
     blackTerritory,
     whiteTerritory,
+    blackTerritoryPoints,
+    whiteTerritoryPoints,
     blackCaptures,
     whiteCaptures,
     komi,

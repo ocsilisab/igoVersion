@@ -349,6 +349,7 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit }: Online
         disabled={boardDisabled}
         deadStones={game.isScoring || game.status === "finished" ? new Set(game.deadStones) : undefined}
         onToggleDead={game.isScoring ? (pos) => void toggleDeadGroup(pos.row, pos.col) : undefined}
+        score={game.isScoring ? scoringPreview : game.status === "finished" ? game.score : undefined}
         lastBomb={game.lastBomb}
       />
 

@@ -88,6 +88,22 @@
   pointer-events: none;
 }
 
+.territory-marker {
+  pointer-events: none;
+}
+
+.territory-marker-black {
+  fill: var(--stone-black);
+  opacity: 0.75;
+}
+
+.territory-marker-white {
+  fill: var(--stone-white);
+  stroke: var(--stone-white-lo);
+  stroke-width: 0.2;
+  opacity: 0.85;
+}
+
 .bomb-marker {
   pointer-events: none;
   fill: none;
