@@ -1,5 +1,6 @@
 import type { Board, BoardSize, Player, Position } from "../../types/game.js";
 import { opponent, posKey } from "../../utils/board.js";
+import { findRealEyePoints } from "../../utils/eyes.js";
 import { getGroup } from "../../utils/liberties.js";
 import { tryMove, type MoveResult } from "../../utils/move.js";
 import { calculateScore } from "../../utils/scoring.js";
@@ -66,11 +67,21 @@ function countStones(board: Board, boardSize: BoardSize): number {
  * Light playout policy: capture an enemy group in atari if one exists (see
  * findAtariCapture); pass once the board is mostly full and there's nothing to capture
  * (see ROLLOUT_PASS_OCCUPANCY); otherwise scan the board once, starting from a random
- * cell and wrapping around, and play the *first* legal move found that doesn't leave the
+ * cell and wrapping around, and play the *first* legal move found — skipping the
+ * player's own real eye points entirely (see findRealEyePoints) — that doesn't leave the
  * played stone's own group in immediate atari. Stopping at the first acceptable move
  * (instead of comparing every legal move, as an earlier version of this function did) is
  * what makes a rollout step cheap — with the board mostly empty this typically resolves
  * in a handful of tryMove calls rather than up to boardSize² of them.
+ *
+ * Never filling your own eyes is one of the best-known, highest-value fixes for a naive
+ * Monte Carlo rollout policy: an eye point "counts" for scoring/life whether or not a
+ * stone actually sits there, so a rollout that doesn't know this will happily fill both
+ * players' eye spaces in on the way to the move cap — corrupting exactly the life-and-death
+ * signal MCTS most needs rollouts to get right. If literally every remaining legal move
+ * is one of the player's own eyes, this passes instead (see the final fallback below)
+ * rather than force one — that's precisely the "nothing left to prove" case a human
+ * passes on too.
  */
 function pickRolloutMove(board: Board, boardSize: BoardSize, player: Player, history: string[]): LegalMoveResult | null {
   const captureAt = findAtariCapture(board, boardSize, player);
@@ -82,6 +93,8 @@ function pickRolloutMove(board: Board, boardSize: BoardSize, player: Player, his
   const totalCells = boardSize * boardSize;
   if (countStones(board, boardSize) / totalCells >= ROLLOUT_PASS_OCCUPANCY) return null;
 
+  const ownEyes = findRealEyePoints(board, boardSize, player);
+
   const offset = Math.floor(Math.random() * totalCells);
   let fallback: LegalMoveResult | null = null;
 
@@ -90,17 +103,18 @@ function pickRolloutMove(board: Board, boardSize: BoardSize, player: Player, his
     const row = Math.floor(cell / boardSize);
     const col = cell % boardSize;
     if (board[row][col] !== null) continue;
+    if (ownEyes.has(posKey({ row, col }))) continue; // never fill your own eye while any other legal move exists
 
     const result = tryMove(board, boardSize, player, { row, col }, history);
     if (!result.ok) continue;
 
-    if (!fallback) fallback = result; // remember the first legal move in case nothing is "safe"
+    if (!fallback) fallback = result; // remember the first non-eye legal move in case nothing is "safe"
 
     const group = getGroup(result.board, { row, col }, boardSize);
     if (group.liberties.size > 1) return result; // first safe move — take it immediately
   }
 
-  return fallback; // every legal move self-ataris (or there were none) — null means "pass"
+  return fallback; // every non-eye legal move self-ataris, or there were none — null means "pass"
 }
 
 /**

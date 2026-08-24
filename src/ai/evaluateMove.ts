@@ -1,5 +1,6 @@
 import type { BoardSize, GameState, Player, Position } from "../types/game";
 import { getNeighbors, opponent, posKey } from "../utils/board";
+import { findRealEyePoints } from "../utils/eyes";
 import { getGroup } from "../utils/liberties";
 import type { ValidAiMove } from "./getValidMoves";
 
@@ -12,6 +13,7 @@ import type { ValidAiMove } from "./getValidMoves";
  */
 const WEIGHTS = {
   capture: 100_000,
+  selfEyeFill: -80_000,
   saveGroup: 20_000,
   atariEnemy: 5_000,
   reduceEnemyLiberty: 200,
@@ -26,6 +28,10 @@ export interface AiEvalContext {
   threatenedOwnGroupLiberties: Map<string, number>;
   ownStonePositions: Position[];
   enemyStonePositions: Position[];
+  /** posKeys that are real eye points for aiColor — see utils/eyes.ts. */
+  ownEyePoints: Set<string>;
+  /** posKeys that are real eye points for the opponent. */
+  enemyEyePoints: Set<string>;
 }
 
 export function buildEvalContext(gameState: GameState, aiColor: Player): AiEvalContext {
@@ -56,7 +62,14 @@ export function buildEvalContext(gameState: GameState, aiColor: Player): AiEvalC
     }
   }
 
-  return { boardSize, threatenedOwnGroupLiberties, ownStonePositions, enemyStonePositions };
+  return {
+    boardSize,
+    threatenedOwnGroupLiberties,
+    ownStonePositions,
+    enemyStonePositions,
+    ownEyePoints: findRealEyePoints(board, boardSize, aiColor),
+    enemyEyePoints: findRealEyePoints(board, boardSize, enemyColor),
+  };
 }
 
 function groupIdentity(stones: Position[]): string {
@@ -107,12 +120,25 @@ function pressureEnemyScore(move: ValidAiMove, aiColor: Player, ctx: AiEvalConte
 
     if (group.liberties.size === 1) {
       score += WEIGHTS.atariEnemy + group.stones.length * 100;
-    } else {
-      score += Math.max(0, 4 - group.liberties.size) * WEIGHTS.reduceEnemyLiberty;
+      continue;
     }
+
+    // A group with 2+ of its remaining liberties inside its own real eye points is
+    // unconditionally alive (see utils/eyes.ts) — chasing its other liberties from here
+    // on is just dame, not a real threat, so it stops earning the pressure bonus below.
+    // Below 2, it's still genuinely killable and reducing it further is worth rewarding.
+    const realEyeLiberties = [...group.liberties].filter((lib) => ctx.enemyEyePoints.has(lib)).length;
+    if (realEyeLiberties >= 2) continue;
+
+    score += Math.max(0, 4 - group.liberties.size) * WEIGHTS.reduceEnemyLiberty;
   }
 
   return score;
+}
+
+/** True when `position` is one of aiColor's own real eye points — see utils/eyes.ts. */
+function isSelfEyeFill(position: Position, ctx: AiEvalContext): boolean {
+  return ctx.ownEyePoints.has(posKey(position));
 }
 
 function proximityScore(position: Position, ctx: AiEvalContext): number {
@@ -151,6 +177,12 @@ export function evaluateMove(move: ValidAiMove, aiColor: Player, ctx: AiEvalCont
   score += pressureEnemyScore(move, aiColor, ctx); // Priority 3: pressure / atari enemy groups
   score += proximityScore(move.position, ctx); // Priority 4: play near existing stones
   score += positionalScore(move.position, ctx.boardSize); // Priority 5: general positional value
+
+  // Filling your own real eye is (at best) a wasted move and can turn a two-eyed group
+  // into a one-eyed one — heavily discouraged regardless of what the priorities above
+  // computed, short of it being the only legal move left (chooseMove.ts still picks
+  // *something* even if every candidate scores this low).
+  if (isSelfEyeFill(move.position, ctx)) score += WEIGHTS.selfEyeFill;
 
   return score;
 }
