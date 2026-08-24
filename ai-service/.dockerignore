@@ -1,6 +1,8 @@
 .venv
 data
-checkpoints/last.pt
+checkpoints/last*.pt
+checkpoints/*_backup.pt
+checkpoints_*x*
 tests
 __pycache__
 **/__pycache__

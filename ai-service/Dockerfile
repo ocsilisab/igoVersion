@@ -9,7 +9,10 @@ RUN pip install --no-cache-dir -r requirements-service.txt
 
 COPY src/ ./src/
 COPY config.yaml .
-COPY checkpoints/best.pt ./checkpoints/best.pt
+# Whole directory (not just best.pt) so every committed best_<size>x<size>.pt -- any
+# board size with a native checkpoint, see service.py's CHECKPOINT_FILENAMES -- ships
+# too, without needing a Dockerfile edit each time a new size gets trained.
+COPY checkpoints/ ./checkpoints/
 
 EXPOSE 8000
 
