@@ -75,9 +75,18 @@ def test_recent_moves_fewer_than_three_pads_with_empty_channels():
     assert tensor[5].sum() == 0.0
 
 
-def test_rejects_wrong_board_size():
+def test_encodes_a_supported_smaller_board_size_natively():
     small_board = [[None] * 9 for _ in range(9)]
-    state = GameStateInput(board=small_board, board_size=9, current_player="black")
+    small_board[3][3] = "black"
+    state = GameStateInput(board=small_board, board_size=9, current_player="white")
+    tensor = encode_position(state)
+    assert tensor.shape == (NUM_CHANNELS, 9, 9)
+    assert tensor[0, 3, 3] == 1.0
+
+
+def test_rejects_unsupported_board_size():
+    tiny_board = [[None] * 5 for _ in range(5)]
+    state = GameStateInput(board=tiny_board, board_size=5, current_player="black")
     with pytest.raises(ValueError):
         encode_position(state)
 

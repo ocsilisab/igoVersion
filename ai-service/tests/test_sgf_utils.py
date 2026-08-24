@@ -1,4 +1,4 @@
-from src.sgf_utils import parse_sgf_game, sgfmill_point_to_app_position
+from src.sgf_utils import parse_sgf_game, rank_at_least, rank_to_numeric, sgfmill_point_to_app_position
 
 
 def test_sgfmill_corner_conversion_matches_app_top_left_origin():
@@ -26,6 +26,51 @@ def test_parse_sgf_game_basic_sequence():
 def test_parse_sgf_game_rejects_non_19x19():
     raw = b"(;GM[1]FF[4]SZ[9];B[ee])"
     assert parse_sgf_game(raw) is None
+
+
+def test_parse_sgf_game_accepts_a_different_target_board_size():
+    raw = b"(;GM[1]FF[4]SZ[9];B[ee])"
+    game = parse_sgf_game(raw, target_board_size=9)
+    assert game is not None
+    assert game.board_size == 9
+    # SGF "ee" on a 9x9 board is the center point (4,4) in app coordinates.
+    assert game.moves == [("black", (4, 4))]
+
+
+def test_parse_sgf_game_extracts_br_wr_when_present():
+    raw = b"(;GM[1]FF[4]SZ[19]BR[3d]WR[27k];B[aa])"
+    game = parse_sgf_game(raw)
+    assert game is not None
+    assert game.black_rank == "3d"
+    assert game.white_rank == "27k"
+
+
+def test_parse_sgf_game_ranks_default_to_none_when_absent():
+    raw = b"(;GM[1]FF[4]SZ[19];B[aa])"
+    game = parse_sgf_game(raw)
+    assert game is not None
+    assert game.black_rank is None
+    assert game.white_rank is None
+
+
+def test_rank_to_numeric_kyu_dan_pro_scale():
+    assert rank_to_numeric("30k") == -30.0
+    assert rank_to_numeric("1k") == -1.0
+    assert rank_to_numeric("1d") == 1.0
+    assert rank_to_numeric("9d") == 9.0
+    assert rank_to_numeric("1p") == 10.0
+    assert rank_to_numeric(None) is None
+    assert rank_to_numeric("") is None
+    assert rank_to_numeric("not a rank") is None
+
+
+def test_rank_at_least_threshold():
+    assert rank_at_least("3d", 1.0) is True
+    assert rank_at_least("1d", 1.0) is True
+    assert rank_at_least("1k", 1.0) is False
+    assert rank_at_least("9d", 1.0) is True
+    assert rank_at_least(None, 1.0) is False
+    assert rank_at_least("garbled", 1.0) is False
 
 
 def test_parse_sgf_game_rejects_handicap_games():

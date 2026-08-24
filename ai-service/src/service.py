@@ -12,9 +12,10 @@ nothing in api/ or src/ (the TS app) is changed by this file.
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import torch
+import torch.nn as nn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -25,7 +26,11 @@ from src.model import load_model_from_checkpoint
 
 SERVICE_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_PATH = SERVICE_ROOT / "config.yaml"
-DEFAULT_CHECKPOINT_PATH = SERVICE_ROOT / "checkpoints" / "best.pt"
+
+# One checkpoint filename per board size, all under checkpoints/ -- 19x19 keeps its
+# original name (that's the one already deployed) rather than being renamed to match.
+CHECKPOINT_FILENAMES: Dict[int, str] = {size: f"best_{size}x{size}.pt" for size in SUPPORTED_BOARD_SIZES}
+CHECKPOINT_FILENAMES[BOARD_SIZE] = "best.pt"
 
 
 class PositionPayload(BaseModel):
@@ -59,26 +64,33 @@ class MoveResponse(BaseModel):
 
 
 class ModelState:
-    model = None
+    models: Dict[int, nn.Module] = {}
     device: torch.device = torch.device("cpu")
 
 
 state = ModelState()
 
 
-def _resolve_checkpoint_path() -> Path:
-    override = os.environ.get("IGO_AI_CHECKPOINT")
-    return Path(override) if override else DEFAULT_CHECKPOINT_PATH
+def _resolve_checkpoint_path(board_size: int) -> Path:
+    # IGO_AI_CHECKPOINT (no size suffix) is kept as the 19x19 override for backward
+    # compatibility with the already-deployed Render setup; every other size gets its own
+    # IGO_AI_CHECKPOINT_<size> variable instead.
+    env_var = "IGO_AI_CHECKPOINT" if board_size == BOARD_SIZE else f"IGO_AI_CHECKPOINT_{board_size}"
+    override = os.environ.get(env_var)
+    if override:
+        return Path(override)
+    return SERVICE_ROOT / "checkpoints" / CHECKPOINT_FILENAMES[board_size]
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    checkpoint_path = _resolve_checkpoint_path()
-    if checkpoint_path.exists():
-        # Deliberately not fatal when missing (tests instantiate `app` without a
-        # trained checkpoint present) -- /ai/move reports a clear 503 instead.
-        state.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        state.model = load_model_from_checkpoint(checkpoint_path, state.device)
+    state.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    for board_size in SUPPORTED_BOARD_SIZES:
+        checkpoint_path = _resolve_checkpoint_path(board_size)
+        if checkpoint_path.exists():
+            # Deliberately not fatal when missing (tests instantiate `app` without any
+            # trained checkpoint present) -- /ai/move reports a clear 503 instead.
+            state.models[board_size] = load_model_from_checkpoint(checkpoint_path, state.device)
     yield
 
 
@@ -97,17 +109,16 @@ app.add_middleware(
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "model_loaded": state.model is not None, "device": str(state.device)}
+    return {
+        "status": "ok",
+        "model_loaded": bool(state.models),
+        "models_loaded": sorted(state.models.keys()),
+        "device": str(state.device),
+    }
 
 
 @app.post("/ai/move", response_model=MoveResponse)
 def ai_move(request: MoveRequest) -> MoveResponse:
-    if state.model is None:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Modelo no cargado (no se encontro checkpoint en {_resolve_checkpoint_path()}).",
-        )
-
     if request.board_size not in SUPPORTED_BOARD_SIZES:
         raise HTTPException(
             status_code=400,
@@ -115,6 +126,19 @@ def ai_move(request: MoveRequest) -> MoveResponse:
         )
     if len(request.board) != request.board_size or any(len(row) != request.board_size for row in request.board):
         raise HTTPException(status_code=400, detail="Las dimensiones de 'board' no coinciden con board_size.")
+
+    # Prefer a checkpoint trained natively for this size; fall back to the 19x19 model
+    # (via inference.py::predict_move's embed_in_canvas path) if none exists yet.
+    model = state.models.get(request.board_size)
+    model_board_size = request.board_size
+    if model is None:
+        model = state.models.get(BOARD_SIZE)
+        model_board_size = BOARD_SIZE
+    if model is None:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Modelo no cargado (no se encontro checkpoint para ningun board_size soportado).",
+        )
 
     game_state = GameStateInput(
         board=request.board,
@@ -124,6 +148,6 @@ def ai_move(request: MoveRequest) -> MoveResponse:
     )
 
     result = predict_move(
-        state.model, game_state, request.history, state.device, top_n=request.top_n
+        model, model_board_size, game_state, request.history, state.device, top_n=request.top_n
     )
     return result

@@ -16,7 +16,7 @@ import torch.nn as nn
 import yaml
 from torch.utils.data import DataLoader
 
-from src.adapters.game_adapter import BOARD_SIZE, PASS_LABEL, label_to_move
+from src.adapters.game_adapter import BOARD_SIZE, label_to_move
 from src.model import load_model_from_checkpoint
 from src.preprocessing import decode_sample_to_tensor
 from src.train import ShardDataset
@@ -56,15 +56,21 @@ def evaluate_dataset(
 
 
 def evaluate_pass_subset(
-    model: nn.Module, processed_dir: Path, device: torch.device, ks: Sequence[int] = (1, 3, 5)
+    model: nn.Module, processed_dir: Path, device: torch.device, board_size: int = BOARD_SIZE,
+    ks: Sequence[int] = (1, 3, 5)
 ) -> Dict[str, float]:
     """Same top-k accuracy as evaluate_dataset, but restricted to test positions whose
-    true label is actually PASS_LABEL. The overall test accuracy above is dominated by
-    the ~361 board-move labels; passing is a single label among 362, so it needs its own
+    true label is actually a pass. The overall test accuracy above is dominated by
+    the board-move labels; passing is a single label among them, so it needs its own
     number to see whether the retraining pass (adding synthetic pass moves for
     real-scored games -- see sgf_utils.py::_ends_by_real_score) actually worked, rather
-    than being invisible in an aggregate that barely samples it either way."""
+    than being invisible in an aggregate that barely samples it either way.
+
+    `board_size` must match the shards in `processed_dir` -- the pass label is
+    board_size^2, not the fixed 19x19 value, so a 9x9 evaluation run needs its own 81
+    rather than defaulting to 361 and silently finding zero pass positions."""
     model.eval()
+    pass_label = board_size * board_size
     correct = {k: 0 for k in ks}
     total = 0
     total_pass_probability = 0.0  # softmax mass on "pass", summed, for computing an average
@@ -74,16 +80,16 @@ def evaluate_pass_subset(
         for shard_path in shard_paths:
             shard = torch.load(shard_path, weights_only=True)
             labels = shard["label"]
-            pass_indices = (labels == PASS_LABEL).nonzero(as_tuple=True)[0].tolist()
+            pass_indices = (labels == pass_label).nonzero(as_tuple=True)[0].tolist()
             if not pass_indices:
                 continue
 
             tensors = torch.stack([decode_sample_to_tensor(shard, i)[0] for i in pass_indices]).to(device)
             logits = model(tensors)
             probs = torch.softmax(logits, dim=1)
-            total_pass_probability += probs[:, PASS_LABEL].sum().item()
+            total_pass_probability += probs[:, pass_label].sum().item()
 
-            batch_labels = torch.full((len(pass_indices),), PASS_LABEL, device=device)
+            batch_labels = torch.full((len(pass_indices),), pass_label, device=device)
             for k in ks:
                 correct[k] += topk_correct(logits, batch_labels, k)
             total += len(pass_indices)
@@ -194,7 +200,7 @@ def main() -> None:
         f"top5={metrics['top5_accuracy'] * 100:.2f}%"
     )
 
-    pass_metrics = evaluate_pass_subset(model, processed_dir, device)
+    pass_metrics = evaluate_pass_subset(model, processed_dir, device, board_size=board_size)
     print(
         f"\n=== Subconjunto 'pase' del test ({pass_metrics['count']:,} posiciones) ===\n"
         f"top1={pass_metrics['top1_accuracy'] * 100:.2f}%  "

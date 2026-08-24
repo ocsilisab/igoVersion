@@ -13,6 +13,7 @@ board, and this module converts that to app position (0, 0). See
 tests/test_sgf_utils.py.
 """
 
+import re
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
@@ -29,6 +30,43 @@ class ParsedGame:
     # Play order, mainline only (variations are ignored). Each entry is
     # (player, position_or_None_for_pass), already in app coordinates.
     moves: List[Tuple[Player, Optional[Position]]]
+    # Raw SGF BR/WR rank strings ("27k", "3d", "9p", ...), when present -- Fox-derived
+    # SGFs use a different (Chinese-suffixed) convention and don't need these, since
+    # those games are already pre-sorted into per-rank folders; OGS-derived SGFs use the
+    # standard SGF convention and need these for rank_at_least filtering (see below), since
+    # a single OGS dump mixes every skill level together.
+    black_rank: Optional[str] = None
+    white_rank: Optional[str] = None
+
+
+_RANK_PATTERN = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*([kdp])\s*$", re.IGNORECASE)
+
+
+def rank_to_numeric(rank: Optional[str]) -> Optional[float]:
+    """Converts a standard SGF rank string to one ascending numeric scale, higher =
+    stronger: kyu counts down towards 0 (30k -> -30, 1k -> -1), dan counts up (1d -> 1,
+    9d -> 9), and pro is treated as strictly stronger than any dan (1p -> 10). Returns
+    None for anything that doesn't match this format at all (blank, a title, etc.)."""
+    if not rank:
+        return None
+    match = _RANK_PATTERN.match(rank)
+    if not match:
+        return None
+    value = float(match.group(1))
+    unit = match.group(2).lower()
+    if unit == "k":
+        return -value
+    if unit == "d":
+        return value
+    return value + 9  # "p" (pro)
+
+
+def rank_at_least(rank: Optional[str], threshold: float) -> bool:
+    """True if `rank` (an SGF BR/WR-style string) parses to a numeric rank (see
+    rank_to_numeric) at or above `threshold`. False for anything unparseable — an
+    unrecorded or malformed rank is never assumed to meet a strength bar."""
+    numeric = rank_to_numeric(rank)
+    return numeric is not None and numeric >= threshold
 
 
 def sgfmill_point_to_app_position(
@@ -63,18 +101,20 @@ def _ends_by_real_score(root) -> bool:
     return margin[:1].isdigit()  # "3.5", "0.0", ... — not "R"/"Resign", "T"/"Time", "F"...
 
 
-def parse_sgf_game(raw: bytes) -> Optional[ParsedGame]:
-    """Returns None for anything this v1 pipeline deliberately skips: non-19x19
-    boards, and handicap games (HA>0 or AB present before move 1) — handicap
-    starting positions would need extra channels/handling this policy net
-    doesn't have yet, and they're a small minority of dan-level Fox games."""
+def parse_sgf_game(raw: bytes, target_board_size: int = TARGET_BOARD_SIZE) -> Optional[ParsedGame]:
+    """Returns None for anything this pipeline deliberately skips: any board size other
+    than `target_board_size` (a different size needs its own preprocessing run and,
+    ultimately, its own trained model — see model.py's fixed-size Linear head), and
+    handicap games (HA>0 or AB present before move 1) — handicap starting positions would
+    need extra channels/handling this policy net doesn't have yet, and they're a small
+    minority of games at the skill levels this pipeline targets."""
     try:
         game = sgf.Sgf_game.from_bytes(raw)
     except (ValueError, StopIteration):
         return None
 
     board_size = game.get_size()
-    if board_size != TARGET_BOARD_SIZE:
+    if board_size != target_board_size:
         return None
 
     root = game.get_root()
@@ -104,4 +144,7 @@ def parse_sgf_game(raw: bytes) -> Optional[ParsedGame]:
         moves.append((other_player, None))
         moves.append((last_player, None))
 
-    return ParsedGame(board_size=board_size, moves=moves)
+    black_rank = root.get("BR") if root.has_property("BR") else None
+    white_rank = root.get("WR") if root.has_property("WR") else None
+
+    return ParsedGame(board_size=board_size, moves=moves, black_rank=black_rank, white_rank=white_rank)

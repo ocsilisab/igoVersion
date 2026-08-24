@@ -47,3 +47,13 @@ def test_transform_label_matches_transform_point(transform_id):
 @pytest.mark.parametrize("transform_id", range(NUM_TRANSFORMS))
 def test_pass_label_is_never_transformed(transform_id):
     assert transform_label(PASS_LABEL, BOARD_SIZE, transform_id) == PASS_LABEL
+
+
+@pytest.mark.parametrize("transform_id", range(NUM_TRANSFORMS))
+def test_pass_label_is_never_transformed_on_a_non_19x19_board(transform_id):
+    # Regression check: this used to compare a shard's label against the fixed 19x19
+    # PASS_LABEL (361) unconditionally, so a real pass on a 9x9 shard (labeled 81) fell
+    # through to label_to_move(81, 9) -- out of range for a 9x9 board -- and crashed.
+    board_size = 9
+    pass_label = board_size * board_size
+    assert transform_label(pass_label, board_size, transform_id) == pass_label

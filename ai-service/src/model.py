@@ -4,11 +4,12 @@ never a replacement for either (see Fase 1 analysis).
 """
 
 from pathlib import Path
+from typing import Optional
 
 import torch
 import torch.nn as nn
 
-from src.adapters.game_adapter import BOARD_SIZE, NUM_CHANNELS, NUM_LABELS
+from src.adapters.game_adapter import BOARD_SIZE, NUM_CHANNELS
 
 
 class ResidualBlock(nn.Module):
@@ -39,9 +40,17 @@ class PolicyNetwork(nn.Module):
         residual_channels: int = 64,
         residual_blocks: int = 6,
         policy_channels: int = 8,
-        num_labels: int = NUM_LABELS,
+        num_labels: Optional[int] = None,
     ):
         super().__init__()
+        # Defaults to board_size^2 + 1 (every point plus a pass) unless explicitly
+        # overridden -- this used to silently default to the 19x19 model's fixed 362 here
+        # instead, so constructing a network for any other board_size without also
+        # remembering to pass num_labels separately produced a model whose output layer
+        # didn't actually match its own board size. Deriving it from board_size makes
+        # that combination impossible instead of relying on every caller to get it right.
+        if num_labels is None:
+            num_labels = board_size * board_size + 1
         self.stem_conv = nn.Conv2d(input_channels, residual_channels, kernel_size=3, padding=1, bias=False)
         self.stem_bn = nn.BatchNorm2d(residual_channels)
         self.residual_tower = nn.Sequential(

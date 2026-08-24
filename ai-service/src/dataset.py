@@ -55,3 +55,22 @@ def iter_rank_sgf_bytes(rank: str, data_dir: Path) -> Iterator[bytes]:
     extract_dir = ensure_rank_extracted(rank, data_dir)
     for sgf_path in sorted(extract_dir.rglob("*.sgf")):
         yield sgf_path.read_bytes()
+
+
+def iter_sgf_bytes_recursive(root_dir: Path) -> Iterator[bytes]:
+    """Streams raw SGF file contents from every *.sgf file found recursively under
+    `root_dir`, in whatever order the filesystem returns them (deliberately *not*
+    sorted). For a pre-downloaded, pre-extracted archive that isn't organized into
+    per-rank folders the way iter_rank_sgf_bytes expects — e.g. the OGS dump, laid out as
+    sgfs-by-date/<year>/<month>/<day>/*.sgf, tens of millions of files deep — rather than
+    a second "how to fetch it" mechanism, since that download is a one-off (see
+    preprocess_ogs.py) and 6+ GB isn't something to script an automatic re-download of.
+
+    Unlike iter_rank_sgf_bytes's per-rank folders (a few hundred thousand files, small
+    enough that sorting them upfront is instant), sorting a source this size before
+    yielding a single file means fully materializing tens of millions of Path objects
+    into memory first — multiple GB and minutes with zero progress to show for it, purely
+    to get a determinism guarantee this caller doesn't actually need (max_games and the
+    per-game rank filter already make "the exact file order" irrelevant to the result)."""
+    for sgf_path in root_dir.rglob("*.sgf"):
+        yield sgf_path.read_bytes()

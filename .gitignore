@@ -19,15 +19,17 @@ dist-ssr
 .vercel
 
 # AI service (Python): venv and downloaded dataset never get committed. checkpoints/
-# is ignored too EXCEPT best.pt (~6MB) -- that's the trained weights the deployed
-# service actually serves, so it needs to be in git for Docker builds on a host that
-# only has the repo, not this machine's local training run.
+# is ignored too EXCEPT best.pt / best_<size>x<size>.pt -- those are the trained weights
+# the deployed service actually serves, so they need to be in git for Docker builds on a
+# host that only has the repo, not this machine's local training run.
 ai-service/.venv
 ai-service/data/*
 !ai-service/data/.gitkeep
 ai-service/checkpoints/*
 !ai-service/checkpoints/.gitkeep
 !ai-service/checkpoints/best.pt
+!ai-service/checkpoints/best_9x9.pt
+ai-service/checkpoints_9x9
 ai-service/__pycache__
 ai-service/**/__pycache__
 ai-service/.pytest_cache

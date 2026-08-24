@@ -27,6 +27,23 @@ def test_output_is_raw_logits_not_softmaxed():
     assert (logits < 0).any()
 
 
+def test_num_labels_auto_derives_from_board_size_when_not_given():
+    # Regression check: this used to silently default to the 19x19 model's fixed 362
+    # regardless of board_size, so any other size's output layer didn't match its own
+    # board at all unless every single caller remembered to pass num_labels separately.
+    model = PolicyNetwork(board_size=9)
+    x = torch.zeros((1, NUM_CHANNELS, 9, 9))
+    logits = model(x)
+    assert logits.shape == (1, 9 * 9 + 1)
+
+
+def test_explicit_num_labels_still_overrides_the_default():
+    model = PolicyNetwork(board_size=9, num_labels=100)
+    x = torch.zeros((1, NUM_CHANNELS, 9, 9))
+    logits = model(x)
+    assert logits.shape == (1, 100)
+
+
 def test_gradients_flow_through_full_network():
     model = PolicyNetwork()
     x = torch.randn((2, NUM_CHANNELS, BOARD_SIZE, BOARD_SIZE))

@@ -1,0 +1,41 @@
+# Configuracion para el modelo de 9x9 -- entrenado con partidas reales de OGS (Online Go
+# Server), no de Fox Go Server: Fox no tiene partidas de 9x9/13x13 en absoluto (~28k
+# partidas comprobadas entre 9d y 3k, 0% eran de otro tamano que 19x19 -- ver notas de la
+# sesion de reentrenamiento de Experta 19x19).
+#
+# Fuente: https://archive.org/details/ogs2021, sgfs-by-date.tar.gz (~6.1GB comprimido,
+# 27M partidas de todos los tamanos y niveles mezcladas). Descargado y extraido a mano en
+# ai-service/data/raw/ogs/sgfs-by-date/ -- no es parte del flujo automatico de
+# src/preprocess_ogs.py, que asume que ya esta ahi.
+
+dataset:
+  source: "https://archive.org/details/ogs2021 (sgfs-by-date.tar.gz)"
+  board_size: 9
+  # SGF BR/WR numeric scale (sgf_utils.py::rank_to_numeric): -5.0 = 5 kyu. Both players
+  # must meet this bar -- OGS mixes every skill level in one dump (unlike Fox's
+  # pre-sorted rank folders), so this per-game filter is the only quality control
+  # available. Measured empirically (400k-file sample) before picking this value: dan
+  # level (>=1.0) is far too rare for 9x9 on OGS -- only ~17.8k games in the whole 10.6M
+  # corpus -- while 5 kyu+ yields an estimated ~331k, comparable in scale to the 19x19
+  # Fox run, while still excluding the weakest/most casual double-digit-kyu games.
+  min_rank: -5.0
+  max_games: 300000
+  max_positions_per_game: 60
+
+model:
+  board_size: 9
+  input_channels: 6
+  residual_channels: 64
+  residual_blocks: 6
+  # num_labels intentionally omitted -- auto-derives to board_size^2 + 1 = 82 (see
+  # model.py::PolicyNetwork), so it can never drift out of sync with board_size here.
+
+training:
+  batch_size: 256
+  epochs: 30
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  mixed_precision: true
+  early_stopping:
+    enabled: true
+    patience: 5

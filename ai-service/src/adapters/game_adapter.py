@@ -6,8 +6,11 @@ web app never needs to know about PyTorch, and this module never needs to know a
 React/Vercel/Supabase. `game_state_from_json` is what an HTTP handler in Fase 5 will call
 after `json.loads`-ing the request body.
 
-v1 scope: 19x19 only, matching the pro-game dataset (see ai-service/config.yaml). The app
-itself also supports 9x9/13x13, but this model does not — see Fase 1 analysis.
+Started 19x19-only (matching the original pro-game dataset, see ai-service/config.yaml)
+but every function here now works natively for any size in SUPPORTED_BOARD_SIZES — a
+9x9 or 13x13 checkpoint, once one exists, trains and runs through the exact same code as
+the 19x19 one. embed_in_canvas is the separate, explicit adaptation used only when no
+dedicated checkpoint exists yet for the requested size.
 """
 
 from dataclasses import dataclass, field
@@ -45,26 +48,29 @@ class GameStateInput:
 
 
 def _validate(state: GameStateInput) -> None:
-    if state.board_size != BOARD_SIZE:
+    if state.board_size not in SUPPORTED_BOARD_SIZES:
         raise ValueError(
-            f"Este modelo solo soporta tableros de {BOARD_SIZE}x{BOARD_SIZE}; "
-            f"se recibio board_size={state.board_size}."
+            f"board_size no soportado: {state.board_size}. Soportados: {SUPPORTED_BOARD_SIZES}."
         )
-    if len(state.board) != BOARD_SIZE or any(len(row) != BOARD_SIZE for row in state.board):
+    if len(state.board) != state.board_size or any(len(row) != state.board_size for row in state.board):
         raise ValueError("Las dimensiones del tablero no coinciden con board_size.")
     if len(state.recent_moves) > NUM_RECENT_MOVES:
         raise ValueError(f"recent_moves no puede tener mas de {NUM_RECENT_MOVES} elementos.")
 
 
 def encode_position(state: GameStateInput) -> torch.Tensor:
-    """Converts a GameStateInput into a [6, 19, 19] float32 tensor (no batch dim — the
-    DataLoader/inference caller is responsible for stacking/batching)."""
+    """Converts a GameStateInput into a [6, board_size, board_size] float32 tensor (no
+    batch dim — the DataLoader/inference caller is responsible for stacking/batching).
+    Works natively for any of SUPPORTED_BOARD_SIZES -- there's no single fixed shape here
+    since each board size trains (or, for 9x9/13x13 without their own checkpoint yet, is
+    embedded into) its own model; see embed_in_canvas for that adaptation."""
     _validate(state)
-    tensor = torch.zeros((NUM_CHANNELS, BOARD_SIZE, BOARD_SIZE), dtype=torch.float32)
+    size = state.board_size
+    tensor = torch.zeros((NUM_CHANNELS, size, size), dtype=torch.float32)
 
-    for row in range(BOARD_SIZE):
+    for row in range(size):
         board_row = state.board[row]
-        for col in range(BOARD_SIZE):
+        for col in range(size):
             stone = board_row[col]
             if stone == "black":
                 tensor[0, row, col] = 1.0

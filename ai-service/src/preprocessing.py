@@ -17,12 +17,12 @@ import argparse
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, List, Optional, Tuple
+from typing import Callable, Iterator, List, Optional, Tuple
 
 import torch
 import yaml
 
-from src.adapters.game_adapter import BOARD_SIZE, PASS_LABEL, Board, Player, Position, move_to_label
+from src.adapters.game_adapter import BOARD_SIZE, Board, Player, Position, move_to_label
 from src.dataset import iter_rank_sgf_bytes
 from src.go_board import apply_move, empty_board
 from src.sgf_utils import ParsedGame, parse_sgf_game
@@ -80,6 +80,7 @@ def iter_game_samples(game: ParsedGame, max_positions_per_game: int) -> Iterator
     board = empty_board(game.board_size)
     recent: List[Optional[Position]] = []  # most-recent-first
     candidates: List[RawSample] = []
+    pass_label = game.board_size * game.board_size
 
     for player, move in game.moves:
         candidates.append(
@@ -94,29 +95,52 @@ def iter_game_samples(game: ParsedGame, max_positions_per_game: int) -> Iterator
         recent = [move] + recent[: NUM_RECENT_MOVES - 1]
 
     indices = set(_sample_indices(len(candidates), max_positions_per_game))
-    indices.update(i for i, c in enumerate(candidates) if c.label == PASS_LABEL)
+    indices.update(i for i, c in enumerate(candidates) if c.label == pass_label)
 
     for i in sorted(indices):
         yield candidates[i]
 
 
 def iter_selected_games(
-    ranks: List[str], data_dir: Path, max_games: int
+    raw_game_bytes: Iterator[bytes],
+    max_games: int,
+    board_size: int = BOARD_SIZE,
+    game_filter: Optional[Callable[[ParsedGame], bool]] = None,
+    scanned_log_every: Optional[int] = None,
 ) -> Iterator[Tuple[int, ParsedGame]]:
-    """Streams (game_index, ParsedGame) across all configured ranks, in rank order,
-    stopping once `max_games` successfully-parsed games have been yielded in total."""
+    """Streams (game_index, ParsedGame) parsed out of `raw_game_bytes`, stopping once
+    `max_games` successfully-parsed (and, if `game_filter` is given, filter-passing)
+    games have been yielded in total. `raw_game_bytes` is caller-supplied so this works
+    for any source -- the Fox per-rank archives (see _iter_fox_rank_bytes below) or a
+    pre-downloaded, differently-organized dump (e.g. the OGS archive).
+
+    `scanned_log_every`, if given, logs progress by *raw items scanned* rather than
+    games kept -- for the Fox archives, already pre-sorted into one rank each, nearly
+    every file qualifies, so logging by games kept (see run_preprocessing) tracks real
+    progress fine. A mixed, unsorted, all-skill-levels dump like OGS can have a qualify
+    rate under 1 in 1000 once filtered by rank, where logging only by games kept would
+    stay silent for a very long time even while genuinely making steady progress."""
     game_index = 0
-    for rank in ranks:
+    scanned = 0
+    for raw in raw_game_bytes:
         if game_index >= max_games:
             return
-        for raw in iter_rank_sgf_bytes(rank, data_dir):
-            if game_index >= max_games:
-                return
-            game = parse_sgf_game(raw)
-            if game is None or len(game.moves) == 0:
-                continue
-            yield game_index, game
-            game_index += 1
+        scanned += 1
+        if scanned_log_every and scanned % scanned_log_every == 0:
+            print(f"  ... {scanned} archivos escaneados, {game_index} partidas validas encontradas", flush=True)
+        game = parse_sgf_game(raw, target_board_size=board_size)
+        if game is None or len(game.moves) == 0:
+            continue
+        if game_filter is not None and not game_filter(game):
+            continue
+        yield game_index, game
+        game_index += 1
+
+
+def _iter_fox_rank_bytes(ranks: List[str], data_dir: Path) -> Iterator[bytes]:
+    """Byte source for the original Fox-go-server archives, one rank folder at a time."""
+    for rank in ranks:
+        yield from iter_rank_sgf_bytes(rank, data_dir)
 
 
 def _sample_to_record(sample: RawSample, board_size: int) -> dict:
@@ -196,6 +220,7 @@ def decode_sample_to_tensor(shard: dict, i: int) -> Tuple[torch.Tensor, int]:
     layout as adapters.game_adapter.encode_position) for sample `i` in a loaded shard,
     plus its label."""
     board_size = shard["board_size"]
+    pass_label = board_size * board_size
     tensor = torch.zeros((6, board_size, board_size), dtype=torch.float32)
     tensor[0] = shard["black"][i].float()
     tensor[1] = shard["white"][i].float()
@@ -203,27 +228,31 @@ def decode_sample_to_tensor(shard: dict, i: int) -> Tuple[torch.Tensor, int]:
         tensor[2].fill_(1.0)
     for c in range(NUM_RECENT_MOVES):
         label = int(shard["recent"][i, c])
-        if label != NONE_MOVE_SENTINEL and label != PASS_LABEL:
+        if label != NONE_MOVE_SENTINEL and label != pass_label:
             row, col = divmod(label, board_size)
             tensor[3 + c, row, col] = 1.0
     return tensor, int(shard["label"][i])
 
 
 def run_preprocessing(
-    ranks: List[str],
-    data_dir: Path,
+    raw_game_bytes: Iterator[bytes],
     out_dir: Path,
     max_games: int,
     max_positions_per_game: int,
+    board_size: int = BOARD_SIZE,
+    game_filter: Optional[Callable[[ParsedGame], bool]] = None,
     shard_size: int = 2000,
     log_every: int = 2000,
+    scanned_log_every: Optional[int] = None,
 ) -> dict:
     """Runs the full pipeline and returns per-split sample counts."""
-    writers = {split: ShardWriter(out_dir, split, shard_size) for split in SPLIT_NAMES}
+    writers = {split: ShardWriter(out_dir, split, shard_size, board_size=board_size) for split in SPLIT_NAMES}
     games_processed = 0
     start = time.time()
     try:
-        for game_index, game in iter_selected_games(ranks, data_dir, max_games):
+        for game_index, game in iter_selected_games(
+            raw_game_bytes, max_games, board_size, game_filter, scanned_log_every
+        ):
             split = _split_for_game(game_index)
             for sample in iter_game_samples(game, max_positions_per_game):
                 writers[split].add(sample)
@@ -255,6 +284,7 @@ def main() -> None:
     with open(args.config, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)
     dataset_cfg = config["dataset"]
+    board_size = dataset_cfg.get("board_size", BOARD_SIZE)
 
     service_root = args.config.resolve().parent
     data_dir = args.data_dir or (service_root / "data")
@@ -262,14 +292,14 @@ def main() -> None:
 
     print(
         f"Preprocesando ranks={dataset_cfg['ranks']} max_games={dataset_cfg['max_games']} "
-        f"max_positions_per_game={dataset_cfg['max_positions_per_game']}",
+        f"board_size={board_size} max_positions_per_game={dataset_cfg['max_positions_per_game']}",
         flush=True,
     )
     stats = run_preprocessing(
-        ranks=dataset_cfg["ranks"],
-        data_dir=data_dir,
+        raw_game_bytes=_iter_fox_rank_bytes(dataset_cfg["ranks"], data_dir),
         out_dir=out_dir,
         max_games=dataset_cfg["max_games"],
+        board_size=board_size,
         max_positions_per_game=dataset_cfg["max_positions_per_game"],
     )
     print(stats)

@@ -1,8 +1,12 @@
+from pathlib import Path
+
 import torch
 
 from src.adapters.game_adapter import BOARD_SIZE, PASS_LABEL, move_to_label
-from src.evaluate import evaluate_dataset, format_move, render_board, topk_correct
+from src.evaluate import evaluate_dataset, evaluate_pass_subset, format_move, render_board, topk_correct
+from src.go_board import empty_board
 from src.model import PolicyNetwork
+from src.preprocessing import RawSample, ShardWriter
 
 
 def test_topk_correct_top1_hit():
@@ -79,3 +83,25 @@ def test_evaluate_dataset_end_to_end_with_tiny_model():
     assert 0.0 <= metrics["top1_accuracy"] <= 1.0
     assert metrics["top1_accuracy"] <= metrics["top3_accuracy"]
     assert metrics["loss"] > 0
+
+
+def test_evaluate_pass_subset_finds_a_pass_on_a_non_19x19_board(tmp_path: Path):
+    # Regression check: evaluate_pass_subset used to filter test shards by the fixed
+    # 19x19 PASS_LABEL (361) regardless of the shards' own board_size, so on a 9x9
+    # checkpoint's test set (where a pass is labeled 81) it silently found zero pass
+    # positions instead of raising or measuring anything.
+    board_size = 9
+    board = empty_board(board_size)
+    sample = RawSample(
+        board=board, current_player="black", recent_moves=[None, None, None], label=board_size * board_size
+    )
+    writer = ShardWriter(tmp_path, "test", shard_size=5, board_size=board_size)
+    writer.add(sample)
+    writer.close()
+
+    model = PolicyNetwork(board_size=board_size, residual_channels=4, residual_blocks=1)
+    model.eval()
+    device = torch.device("cpu")
+
+    metrics = evaluate_pass_subset(model, tmp_path, device, board_size=board_size, ks=(1,))
+    assert metrics["count"] == 1

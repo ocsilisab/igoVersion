@@ -11,6 +11,7 @@ from src.preprocessing import (
     _split_for_game,
     decode_sample_to_tensor,
     iter_game_samples,
+    iter_selected_games,
 )
 from src.sgf_utils import ParsedGame
 
@@ -94,6 +95,48 @@ def test_iter_game_samples_does_not_duplicate_pass_already_in_even_sample():
     assert samples[1].label == PASS_LABEL
 
 
+def test_iter_game_samples_recognizes_a_pass_on_a_non_19x19_board():
+    # Regression check: this used to compare against the 19x19 PASS_LABEL constant
+    # (361) unconditionally, so a smaller board's own pass label (e.g. 81 for 9x9) was
+    # never recognized as "a pass" by the "always keep pass positions" logic at all.
+    moves = [("black" if i % 2 == 0 else "white", (i % 9, 0)) for i in range(30)]
+    moves.append(("black" if len(moves) % 2 == 0 else "white", None))
+    game = ParsedGame(board_size=9, moves=moves)
+
+    samples = list(iter_game_samples(game, max_positions_per_game=5))
+    assert any(s.label == 9 * 9 for s in samples)
+
+
+def _sgf(board_size: int, move_letter: str = "ee") -> bytes:
+    return f"(;GM[1]FF[4]SZ[{board_size}];B[{move_letter}])".encode()
+
+
+def test_iter_selected_games_stops_at_max_games():
+    raw_games = [_sgf(19) for _ in range(10)]
+    games = list(iter_selected_games(iter(raw_games), max_games=3))
+    assert [i for i, _ in games] == [0, 1, 2]
+
+
+def test_iter_selected_games_applies_the_game_filter():
+    raw_games = [_sgf(19, "aa"), _sgf(19, "bb"), _sgf(19, "cc")]
+    kept = list(iter_selected_games(iter(raw_games), max_games=10, game_filter=lambda g: g.moves[0][1] != (1, 1)))
+    assert [g.moves[0][1] for _, g in kept] == [(0, 0), (2, 2)]  # "bb" -> (1,1) filtered out
+
+
+def test_iter_selected_games_respects_board_size():
+    raw_games = [_sgf(19), _sgf(9), _sgf(19)]
+    games = list(iter_selected_games(iter(raw_games), max_games=10, board_size=9))
+    assert len(games) == 1
+    assert games[0][1].board_size == 9
+
+
+def test_iter_selected_games_scanned_log_every_reports_progress(capsys):
+    raw_games = [_sgf(19) for _ in range(5)]
+    list(iter_selected_games(iter(raw_games), max_games=10, scanned_log_every=2))
+    out = capsys.readouterr().out
+    assert out.count("archivos escaneados") == 2  # fires at scanned == 2 and scanned == 4
+
+
 def test_decode_sample_to_tensor_matches_direct_encode_position(tmp_path: Path):
     board = empty_board(BOARD_SIZE)
     board[3][4] = "black"
@@ -126,6 +169,33 @@ def test_decode_sample_to_tensor_matches_direct_encode_position(tmp_path: Path):
         )
     )
     assert torch.equal(tensor, expected)
+
+
+def test_decode_sample_to_tensor_handles_a_pass_in_recent_moves_on_a_smaller_board(tmp_path: Path):
+    # Regression check: this used to compare a shard's "recent move" label against the
+    # fixed 19x19 PASS_LABEL (361). On a 9x9 shard a real pass is labeled 81, which
+    # doesn't equal 361 -- so this was mistaken for a real board position and decoded via
+    # divmod(81, 9) = (9, 0), an out-of-bounds row on a 9x9 board (valid rows are 0-8),
+    # crashing with an index error instead of correctly leaving that channel empty.
+    board_size = 9
+    board = empty_board(board_size)
+    sample = RawSample(
+        board=board,
+        current_player="black",
+        recent_moves=[None, (3, 3), None],  # most-recent-first: a pass, then a real move
+        label=board_size * board_size,  # this ply is also a pass
+    )
+
+    writer = ShardWriter(tmp_path, "train", shard_size=5, board_size=board_size)
+    writer.add(sample)
+    writer.close()
+
+    shard = torch.load(tmp_path / "train" / "shard_00000.pt")
+    tensor, label = decode_sample_to_tensor(shard, 0)
+    assert tensor.shape == (6, board_size, board_size)
+    assert label == board_size * board_size
+    assert tensor[3].sum() == 0.0  # the pass contributes no marked position
+    assert tensor[4, 3, 3] == 1.0  # the real move one ply back still does
 
 
 def test_shard_writer_flushes_multiple_shards(tmp_path: Path):

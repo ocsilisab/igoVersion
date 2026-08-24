@@ -12,7 +12,7 @@ from typing import Optional, Tuple
 
 import torch
 
-from src.adapters.game_adapter import PASS_LABEL, label_to_move, move_to_label
+from src.adapters.game_adapter import label_to_move, move_to_label
 
 NUM_TRANSFORMS = 8
 
@@ -45,9 +45,13 @@ def transform_point(row: int, col: int, size: int, transform_id: int) -> Tuple[i
 
 
 def transform_label(label: int, size: int, transform_id: int) -> int:
-    """Transforms a move label (0..size*size-1, or PASS_LABEL). PASS is never touched."""
-    if label == PASS_LABEL:
-        return PASS_LABEL
+    """Transforms a move label (0..size*size-1, or the pass label size*size). PASS is
+    never touched -- must compare against `size`'s own pass label, not the fixed 19x19
+    PASS_LABEL (361): on a 9x9 shard a real pass is labeled 81, which would otherwise
+    fall through to label_to_move(81, 9) and crash (81 is out of range for a 9x9 move)."""
+    pass_label = size * size
+    if label == pass_label:
+        return pass_label
     move = label_to_move(label, size)
     assert move is not None
     row, col = transform_point(move[0], move[1], size, transform_id)
