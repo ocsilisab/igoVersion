@@ -13,6 +13,18 @@ type LegalMoveResult = Extract<MoveResult, { ok: true }>;
 const ROLLOUT_MOVE_CAP_MULTIPLIER = 2;
 
 /**
+ * How many safe (non-self-atari, non-own-eye) candidate moves pickRolloutMove looks at
+ * before picking the one that leaves the strongest (highest-liberty) resulting group,
+ * instead of just taking literally the first one found. A small, fixed sample keeps a
+ * rollout step cheap (still nowhere near comparing every legal move) while biasing
+ * playouts toward connecting to and building on existing stones rather than scattering
+ * new weak, isolated ones — the same "build strong, connected groups" instinct the
+ * "Fácil" heuristic gets from evaluateMove.ts's groupStrengthScore, applied here so
+ * simulated games play out in a way that actually reflects it.
+ */
+const ROLLOUT_CANDIDATE_SAMPLE_SIZE = 5;
+
+/**
  * Once the board is at least this full, a "player" in a rollout passes instead of hunting
  * for a fill-in move, as long as there's nothing worth capturing. Without this, a rollout
  * has no notion of "this move is pointless" and happily plays on toward the move cap on
@@ -67,12 +79,13 @@ function countStones(board: Board, boardSize: BoardSize): number {
  * Light playout policy: capture an enemy group in atari if one exists (see
  * findAtariCapture); pass once the board is mostly full and there's nothing to capture
  * (see ROLLOUT_PASS_OCCUPANCY); otherwise scan the board once, starting from a random
- * cell and wrapping around, and play the *first* legal move found — skipping the
- * player's own real eye points entirely (see findRealEyePoints) — that doesn't leave the
- * played stone's own group in immediate atari. Stopping at the first acceptable move
- * (instead of comparing every legal move, as an earlier version of this function did) is
- * what makes a rollout step cheap — with the board mostly empty this typically resolves
- * in a handful of tryMove calls rather than up to boardSize² of them.
+ * cell and wrapping around, and play the strongest of the first few safe candidates
+ * found — skipping the player's own real eye points entirely (see findRealEyePoints) —
+ * that don't leave the played stone's own group in immediate atari. Stopping the scan
+ * after ROLLOUT_CANDIDATE_SAMPLE_SIZE safe candidates (instead of comparing every legal
+ * move, as an earlier version of this function did) is what keeps a rollout step cheap —
+ * with the board mostly empty this typically still resolves in a handful of tryMove
+ * calls rather than up to boardSize² of them.
  *
  * Never filling your own eyes is one of the best-known, highest-value fixes for a naive
  * Monte Carlo rollout policy: an eye point "counts" for scoring/life whether or not a
@@ -97,8 +110,11 @@ function pickRolloutMove(board: Board, boardSize: BoardSize, player: Player, his
 
   const offset = Math.floor(Math.random() * totalCells);
   let fallback: LegalMoveResult | null = null;
+  let bestSafe: LegalMoveResult | null = null;
+  let bestSafeLiberties = 0;
+  let safeCount = 0;
 
-  for (let i = 0; i < totalCells; i++) {
+  for (let i = 0; i < totalCells && safeCount < ROLLOUT_CANDIDATE_SAMPLE_SIZE; i++) {
     const cell = (offset + i) % totalCells;
     const row = Math.floor(cell / boardSize);
     const col = cell % boardSize;
@@ -111,10 +127,16 @@ function pickRolloutMove(board: Board, boardSize: BoardSize, player: Player, his
     if (!fallback) fallback = result; // remember the first non-eye legal move in case nothing is "safe"
 
     const group = getGroup(result.board, { row, col }, boardSize);
-    if (group.liberties.size > 1) return result; // first safe move — take it immediately
+    if (group.liberties.size <= 1) continue;
+
+    safeCount++;
+    if (group.liberties.size > bestSafeLiberties) {
+      bestSafeLiberties = group.liberties.size;
+      bestSafe = result;
+    }
   }
 
-  return fallback; // every non-eye legal move self-ataris, or there were none — null means "pass"
+  return bestSafe ?? fallback; // no safe move sampled — fall back to a self-atari move, or none at all
 }
 
 /**

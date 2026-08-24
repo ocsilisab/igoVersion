@@ -7,7 +7,7 @@ import type { ValidAiMove } from "./getValidMoves";
 /**
  * Weights are deliberately spaced in orders of magnitude so that a higher-priority
  * consideration always dominates every lower-priority one combined — this reproduces
- * the "priority 1 > 2 > 3 > 4 > 5" behaviour requested for the easy AI using a single
+ * the "priority 1 > 2 > 3 > ... > 6" behaviour requested for the easy AI using a single
  * additive score instead of a chain of hard filters, which keeps evaluateMove.ts the
  * only place a future (medium/hard) difficulty would need to touch.
  */
@@ -17,10 +17,16 @@ const WEIGHTS = {
   saveGroup: 20_000,
   atariEnemy: 5_000,
   reduceEnemyLiberty: 200,
+  groupStrength: 150,
   ownProximity: 12,
   enemyProximity: 6,
   positional: 1,
 } as const;
+
+/** Liberty counts above this stop adding further group-strength reward — an 8-liberty
+ * group is already about as safe as it needs to be; anything past that is diminishing
+ * returns this heuristic doesn't need to keep chasing. */
+const GROUP_STRENGTH_LIBERTY_CAP = 8;
 
 export interface AiEvalContext {
   boardSize: BoardSize;
@@ -141,6 +147,22 @@ function isSelfEyeFill(position: Position, ctx: AiEvalContext): boolean {
   return ctx.ownEyePoints.has(posKey(position));
 }
 
+/**
+ * Rewards ending up in a strong, well-connected group rather than a weak, isolated one:
+ * scores the *resulting* group's liberty count after the move (capped — see
+ * GROUP_STRENGTH_LIBERTY_CAP). A stone that connects to friendly stones nearby, or
+ * especially one that merges two previously-separate own groups into one, ends up with
+ * far more liberties than an isolated stone dropped into empty space would — so this
+ * naturally favors building on what's already there over scattering new weak groups,
+ * without needing to special-case "is this a merge" directly. Applies to every move, not
+ * just defensive ones (see saveGroupScore for the separate, much larger bonus reserved
+ * for groups that were already in real danger).
+ */
+function groupStrengthScore(move: ValidAiMove, ctx: AiEvalContext): number {
+  const group = getGroup(move.resultingBoard, move.position, ctx.boardSize);
+  return Math.min(group.liberties.size, GROUP_STRENGTH_LIBERTY_CAP) * WEIGHTS.groupStrength;
+}
+
 function proximityScore(position: Position, ctx: AiEvalContext): number {
   let score = 0;
 
@@ -175,8 +197,9 @@ export function evaluateMove(move: ValidAiMove, aiColor: Player, ctx: AiEvalCont
 
   score += saveGroupScore(move, aiColor, ctx); // Priority 2: save own threatened groups
   score += pressureEnemyScore(move, aiColor, ctx); // Priority 3: pressure / atari enemy groups
-  score += proximityScore(move.position, ctx); // Priority 4: play near existing stones
-  score += positionalScore(move.position, ctx.boardSize); // Priority 5: general positional value
+  score += groupStrengthScore(move, ctx); // Priority 4: build strong, connected groups
+  score += proximityScore(move.position, ctx); // Priority 5: play near existing stones
+  score += positionalScore(move.position, ctx.boardSize); // Priority 6: general positional value
 
   // Filling your own real eye is (at best) a wasted move and can turn a two-eyed group
   // into a one-eyed one — heavily discouraged regardless of what the priorities above
