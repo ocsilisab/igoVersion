@@ -89,7 +89,7 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
   const [switchError, setSwitchError] = useState<string | null>(null);
   const autoJoinAttempted = useRef(false);
 
-  const { games: openGames, loading: loadingOpenGames } = useOpenGames(gameId);
+  const { games: openGames, loading: loadingOpenGames } = useOpenGames();
 
   // A personal invite link: claim that seat automatically, then drop the token from the
   // URL so a refresh doesn't try (harmlessly, but pointlessly) to reclaim it.
@@ -320,14 +320,15 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
 
         {isMember && (
           <section className="online-other-games">
-            <h2>Otras partidas abiertas</h2>
+            <h2>Partidas abiertas</h2>
             <OpenGamesPanel
               games={openGames}
               loading={loadingOpenGames}
               joiningId={switchingId}
               onJoin={(id) => void handleSwitchGame(id)}
               disabled={switchingId !== null}
-              emptyHint="No hay otras partidas abiertas ahora mismo."
+              emptyHint="No hay partidas abiertas ahora mismo."
+              currentGameId={game.id}
             />
             {switchError && <p className="error-banner">{switchError}</p>}
           </section>

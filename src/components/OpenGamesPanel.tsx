@@ -10,34 +10,51 @@ interface OpenGamesPanelProps {
   /** Disables every "Unirse" button, e.g. while some other action is already in flight. */
   disabled?: boolean;
   emptyHint: string;
+  /** Your own game, if it's in the list — shown but not joinable (see OnlineGameScreen). */
+  currentGameId?: string;
 }
 
 /** The public lobby list — shared by CreateOnlineGame (before playing) and OnlineGameScreen's
  * waiting room (so you can jump to another game instead of waiting for yours to fill up). */
-export default function OpenGamesPanel({ games, loading, joiningId, onJoin, disabled, emptyHint }: OpenGamesPanelProps) {
+export default function OpenGamesPanel({
+  games,
+  loading,
+  joiningId,
+  onJoin,
+  disabled,
+  emptyHint,
+  currentGameId,
+}: OpenGamesPanelProps) {
   if (games.length === 0) {
     return <p className="open-games-hint">{loading ? "Buscando partidas…" : emptyHint}</p>;
   }
 
   return (
     <div className="open-games-list">
-      {games.map((g) => (
-        <div className="open-game-row" key={g.id}>
-          <div className="open-game-info">
-            <span className="open-game-size">
-              {g.boardSize} × {g.boardSize}
-            </span>
-            <span className="open-game-meta">
-              {g.blackCount + g.whiteCount}/{g.maxPlayers} jugadores · Komi {g.komi}
-              {g.extensions.bombs ? " · Bombas" : ""}
-              {g.extensions.stars ? " · Estrellas" : ""}
-            </span>
+      {games.map((g) => {
+        const isOwn = g.id === currentGameId;
+        return (
+          <div className={`open-game-row${isOwn ? " open-game-row-own" : ""}`} key={g.id}>
+            <div className="open-game-info">
+              <span className="open-game-size">
+                {g.boardSize} × {g.boardSize}
+              </span>
+              <span className="open-game-meta">
+                {g.blackCount + g.whiteCount}/{g.maxPlayers} jugadores · Komi {g.komi}
+                {g.extensions.bombs ? " · Bombas" : ""}
+                {g.extensions.stars ? " · Estrellas" : ""}
+              </span>
+            </div>
+            {isOwn ? (
+              <span className="open-game-own-badge">Tu partida</span>
+            ) : (
+              <button className="btn btn-secondary" onClick={() => onJoin(g.id)} disabled={disabled}>
+                {joiningId === g.id ? "Uniéndose…" : "Unirse"}
+              </button>
+            )}
           </div>
-          <button className="btn btn-secondary" onClick={() => onJoin(g.id)} disabled={disabled}>
-            {joiningId === g.id ? "Uniéndose…" : "Unirse"}
-          </button>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
