@@ -4,9 +4,7 @@ import SoloSetup from "./components/SoloSetup";
 import GameScreen from "./components/GameScreen";
 import GameSetup from "./components/GameSetup";
 import AiGameScreen from "./components/AiGameScreen";
-import OnlineSetup from "./components/OnlineSetup";
 import CreateOnlineGame from "./components/CreateOnlineGame";
-import JoinOnlineGame from "./components/JoinOnlineGame";
 import OnlineGameScreen from "./components/OnlineGameScreen";
 import CardsMenu from "./components/CardsMenu";
 import DeckBuilder from "./components/DeckBuilder";
@@ -22,8 +20,6 @@ type Screen =
   | "ai-setup"
   | "ai-game"
   | "online-setup"
-  | "online-create"
-  | "online-join"
   | "online-game"
   | "cards-menu"
   | "deck-builder"
@@ -156,15 +152,7 @@ export default function App() {
   }
 
   if (screen === "online-setup") {
-    return <OnlineSetup onCancel={goHome} onCreate={() => setScreen("online-create")} onJoin={() => setScreen("online-join")} />;
-  }
-
-  if (screen === "online-create") {
-    return <CreateOnlineGame onCancel={() => setScreen("online-setup")} onCreated={enterOnlineGame} />;
-  }
-
-  if (screen === "online-join") {
-    return <JoinOnlineGame onCancel={() => setScreen("online-setup")} onJoined={enterOnlineGame} />;
+    return <CreateOnlineGame onCancel={goHome} onEntered={enterOnlineGame} />;
   }
 
   if (screen === "online-game" && onlineGameId) {

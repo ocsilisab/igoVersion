@@ -1,5 +1,5 @@
 import type { BoardSize, ExtensionRules, Player } from "../types/game.js";
-import type { ApiErrorBody, GameMutationResponse, GameResponse } from "./types.js";
+import type { ApiErrorBody, GameMutationResponse, GameResponse, OpenGamesResponse } from "./types.js";
 
 export class OnlineApiError extends Error {
   code: ApiErrorBody["error"];
@@ -50,6 +50,11 @@ export function createOnlineGame(
       extensionStars: extensions.stars,
     }),
   });
+}
+
+/** The public lobby: open games anyone can join, refreshed by polling — see CreateOnlineGame. */
+export function listOpenGames(): Promise<OpenGamesResponse> {
+  return request<OpenGamesResponse>("/api/games");
 }
 
 export function joinOnlineGame(code: string, displayName?: string): Promise<GameResponse> {

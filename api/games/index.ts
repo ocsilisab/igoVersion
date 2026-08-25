@@ -6,7 +6,7 @@ import { withHandler, readBody } from "../_lib/http.js";
 import { checkRateLimit } from "../_lib/rateLimit.js";
 import { Errors } from "../_lib/errors.js";
 import { ensureGuestId, sanitizeDisplayName, defaultGuestName } from "../_lib/session.js";
-import { createGame } from "../_lib/gameRepo.js";
+import { createGame, listOpenGames } from "../_lib/gameRepo.js";
 
 const VALID_SIZES: BoardSize[] = [9, 13, 19];
 
@@ -20,7 +20,13 @@ interface CreateGameBody {
   extensionStars?: boolean;
 }
 
-export default withHandler(["POST"], async (req: VercelRequest, res: VercelResponse) => {
+export default withHandler(["GET", "POST"], async (req: VercelRequest, res: VercelResponse) => {
+  if (req.method === "GET") {
+    const games = await listOpenGames();
+    res.status(200).json({ games });
+    return;
+  }
+
   const allowed = await checkRateLimit(req, { action: "create_game", limit: 10, windowSeconds: 60 });
   if (!allowed) throw Errors.rateLimited();
 

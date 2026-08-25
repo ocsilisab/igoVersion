@@ -1,21 +1,24 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { BoardSize, ExtensionRules, Player, TeamRoster } from "../types/game";
 import { DEFAULT_KOMI, MIN_TOTAL_PLAYERS, MAX_TOTAL_PLAYERS, NO_EXTENSIONS } from "../types/game";
+import type { OpenGameSummary } from "../online/types";
 import { assignSeatTeams } from "../online/teamAssignment";
-import { createOnlineGame, OnlineApiError } from "../online/api";
+import { createOnlineGame, joinOnlineGame, joinOnlineGameById, listOpenGames, OnlineApiError } from "../online/api";
 import KomiSelector from "./KomiSelector";
 import TeamSplitPreview from "./TeamSplitPreview";
 import ExtensionsSelector from "./ExtensionsSelector";
 import "./GameSetup.css";
+import "./CreateOnlineGame.css";
 
 interface CreateOnlineGameProps {
   onCancel: () => void;
-  onCreated: (gameId: string) => void;
+  onEntered: (gameId: string) => void;
 }
 
 const BOARD_SIZES: BoardSize[] = [9, 13, 19];
+const OPEN_GAMES_POLL_MS = 4000;
 
-export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGameProps) {
+export default function CreateOnlineGame({ onCancel, onEntered }: CreateOnlineGameProps) {
   const [boardSize, setBoardSize] = useState<BoardSize>(9);
   const [maxPlayers, setMaxPlayers] = useState<number>(MIN_TOTAL_PLAYERS);
   const [creatorColor, setCreatorColor] = useState<Player>("black");
@@ -25,6 +28,37 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [openGames, setOpenGames] = useState<OpenGameSummary[]>([]);
+  const [loadingGames, setLoadingGames] = useState(true);
+  const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
+
+  const [showCodeEntry, setShowCodeEntry] = useState(false);
+  const [codeInput, setCodeInput] = useState("");
+  const [isJoiningByCode, setIsJoiningByCode] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => {
+      listOpenGames()
+        .then((res) => {
+          if (!cancelled) setOpenGames(res.games);
+        })
+        .catch(() => {
+          // Transient — the next poll retries; the panel just keeps showing the last list.
+        })
+        .finally(() => {
+          if (!cancelled) setLoadingGames(false);
+        });
+    };
+    refresh();
+    const interval = window.setInterval(refresh, OPEN_GAMES_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, []);
+
   const teamsPreview = useMemo<TeamRoster>(() => {
     const seatTeams = assignSeatTeams(creatorColor, maxPlayers);
     const teams: TeamRoster = { black: [], white: [] };
@@ -33,6 +67,8 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
     });
     return teams;
   }, [creatorColor, maxPlayers]);
+
+  const busy = isCreating || joiningId !== null || isJoiningByCode;
 
   const handleCreate = async () => {
     setIsCreating(true);
@@ -46,24 +82,49 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
         extensions,
         displayName.trim() || undefined
       );
-      onCreated(game.id);
+      onEntered(game.id);
     } catch (err) {
       setError(err instanceof OnlineApiError ? err.message : "No se ha podido crear la partida.");
       setIsCreating(false);
     }
   };
 
+  const handleJoinGame = async (id: string) => {
+    setJoiningId(id);
+    setJoinError(null);
+    try {
+      const { game } = await joinOnlineGameById(id, displayName.trim() || undefined);
+      onEntered(game.id);
+    } catch (err) {
+      setJoinError(err instanceof OnlineApiError ? err.message : "No se ha podido unir a la partida.");
+      setJoiningId(null);
+    }
+  };
+
+  const handleJoinByCode = async () => {
+    if (codeInput.trim().length === 0) return;
+    setIsJoiningByCode(true);
+    setJoinError(null);
+    try {
+      const { game } = await joinOnlineGame(codeInput.trim(), displayName.trim() || undefined);
+      onEntered(game.id);
+    } catch (err) {
+      setJoinError(err instanceof OnlineApiError ? err.message : "No se ha podido unir a la partida.");
+      setIsJoiningByCode(false);
+    }
+  };
+
   return (
     <div className="setup-screen">
       <div className="setup-content">
-        <button className="link-button" onClick={onCancel} disabled={isCreating}>
+        <button className="link-button" onClick={onCancel} disabled={busy}>
           ← Atrás
         </button>
 
-        <h1 className="setup-title">Crear partida online</h1>
+        <h1 className="setup-title">Jugar online</h1>
         <p className="setup-subtitle">
-          Añade tantas plazas como jugadores esperas — cada una genera su propio enlace de invitación. La partida se
-          podrá empezar en cuanto haya al menos uno en cada color, sin esperar a llenar el resto de plazas.
+          Únete a una de las partidas abiertas de la lista, o elige tus parámetros y crea la tuya — cada plaza extra
+          genera su propio enlace de invitación.
         </p>
 
         <section className="setup-section">
@@ -74,7 +135,7 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
                 key={size}
                 className={`setup-option ${boardSize === size ? "setup-option-active" : ""}`}
                 onClick={() => setBoardSize(size)}
-                disabled={isCreating}
+                disabled={busy}
               >
                 {size} × {size}
               </button>
@@ -97,7 +158,7 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
                     type="button"
                     className="player-roster-remove"
                     onClick={() => setMaxPlayers((n) => n - 1)}
-                    disabled={isCreating}
+                    disabled={busy}
                     aria-label="Quitar plaza"
                   >
                     ✕
@@ -111,7 +172,7 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
               type="button"
               className="btn btn-secondary player-roster-add"
               onClick={() => setMaxPlayers((n) => n + 1)}
-              disabled={isCreating}
+              disabled={busy}
             >
               + Añadir jugador
             </button>
@@ -126,23 +187,23 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
             <button
               className={`setup-option ${creatorColor === "black" ? "setup-option-active" : ""}`}
               onClick={() => setCreatorColor("black")}
-              disabled={isCreating}
+              disabled={busy}
             >
               <span className="stone-dot stone-dot-black" /> Negras
             </button>
             <button
               className={`setup-option ${creatorColor === "white" ? "setup-option-active" : ""}`}
               onClick={() => setCreatorColor("white")}
-              disabled={isCreating}
+              disabled={busy}
             >
               <span className="stone-dot stone-dot-white" /> Blancas
             </button>
           </div>
         </section>
 
-        <KomiSelector komi={komi} onSelect={setKomi} disabled={isCreating} />
+        <KomiSelector komi={komi} onSelect={setKomi} disabled={busy} />
 
-        <ExtensionsSelector extensions={extensions} onChange={setExtensions} disabled={isCreating} />
+        <ExtensionsSelector extensions={extensions} onChange={setExtensions} disabled={busy} />
 
         <section className="setup-section">
           <h2>Tu nombre (opcional)</h2>
@@ -153,13 +214,81 @@ export default function CreateOnlineGame({ onCancel, onCreated }: CreateOnlineGa
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder="Invitado_XXXX"
             maxLength={24}
-            disabled={isCreating}
+            disabled={busy}
           />
+        </section>
+
+        <section className="setup-section">
+          <h2>Partidas abiertas</h2>
+
+          {openGames.length === 0 ? (
+            <p className="setup-hint">
+              {loadingGames ? "Buscando partidas…" : "No hay partidas abiertas ahora mismo. Crea una para empezar."}
+            </p>
+          ) : (
+            <div className="open-games-list">
+              {openGames.map((g) => (
+                <div className="open-game-row" key={g.id}>
+                  <div className="open-game-info">
+                    <span className="open-game-size">
+                      {g.boardSize} × {g.boardSize}
+                    </span>
+                    <span className="open-game-meta">
+                      {g.blackCount + g.whiteCount}/{g.maxPlayers} jugadores · Komi {g.komi}
+                      {g.extensions.bombs ? " · Bombas" : ""}
+                      {g.extensions.stars ? " · Estrellas" : ""}
+                    </span>
+                  </div>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => void handleJoinGame(g.id)}
+                    disabled={busy}
+                  >
+                    {joiningId === g.id ? "Uniéndose…" : "Unirse"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            type="button"
+            className="link-button open-games-code-toggle"
+            onClick={() => setShowCodeEntry((v) => !v)}
+            disabled={busy}
+          >
+            {showCodeEntry ? "Ocultar código" : "¿Tienes un código?"}
+          </button>
+
+          {showCodeEntry && (
+            <div className="open-games-code-entry">
+              <input
+                className="setup-input setup-input-code"
+                type="text"
+                value={codeInput}
+                onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
+                placeholder="AB7K92"
+                maxLength={6}
+                disabled={busy}
+                autoCapitalize="characters"
+                autoComplete="off"
+              />
+              <button
+                className="btn btn-secondary"
+                onClick={() => void handleJoinByCode()}
+                disabled={busy || codeInput.trim().length === 0}
+              >
+                {isJoiningByCode ? "Uniéndose…" : "Unirse con código"}
+              </button>
+            </div>
+          )}
+
+          {joinError && <p className="error-banner">{joinError}</p>}
         </section>
 
         {error && <p className="error-banner">{error}</p>}
 
-        <button className="btn btn-primary setup-start" onClick={handleCreate} disabled={isCreating}>
+        <button className="btn btn-primary setup-start" onClick={() => void handleCreate()} disabled={busy}>
           {isCreating ? "Creando…" : "Crear partida"}
         </button>
       </div>

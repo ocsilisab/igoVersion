@@ -1,0 +1,47 @@
+.open-games-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.open-game-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.open-game-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.open-game-size {
+  font-weight: 600;
+}
+
+.open-game-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.open-games-code-toggle {
+  font-size: 0.85rem;
+}
+
+.open-games-code-entry {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.open-games-code-entry .setup-input-code {
+  flex: 1 1 auto;
+}

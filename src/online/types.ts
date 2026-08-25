@@ -82,6 +82,22 @@ export interface OnlineGame {
   expiresAt: string;
 }
 
+/** One row in the public lobby list (GET /api/games) — enough to decide whether to join, no board state. */
+export interface OpenGameSummary {
+  id: string;
+  boardSize: BoardSize;
+  maxPlayers: number;
+  komi: number;
+  extensions: ExtensionRules;
+  blackCount: number;
+  whiteCount: number;
+  createdAt: string;
+}
+
+export interface OpenGamesResponse {
+  games: OpenGameSummary[];
+}
+
 export interface YouInfo {
   guestId: string;
   userType: UserType;

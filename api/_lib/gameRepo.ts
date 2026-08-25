@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { Board, BoardSize, ExtensionRules, Player } from "../../src/types/game.js";
 import { createEmptyBoard, serializeBoard } from "../../src/utils/board.js";
-import type { OnlineGame, OnlineGameStatus, OnlinePlayer, PendingSeat } from "../../src/online/types.js";
+import type { OnlineGame, OnlineGameStatus, OnlinePlayer, OpenGameSummary, PendingSeat } from "../../src/online/types.js";
 import { getActivePlayer } from "../../src/online/turns.js";
 import { assignSeatTeams } from "../../src/online/teamAssignment.js";
 import { generateGameCode } from "./gameCode.js";
@@ -126,6 +126,50 @@ async function findGameByCode(code: string): Promise<OnlineGame | null> {
   if (error) throw Errors.serverError();
   if (!data) return null;
   return rowToGame(data as GameRow, await fetchPlayers((data as GameRow).id));
+}
+
+const OPEN_GAMES_LIMIT = 30;
+
+interface OpenGameRow {
+  id: string;
+  board_size: number;
+  max_players: number;
+  komi: number;
+  extension_bombs: boolean;
+  extension_stars: boolean;
+  created_at: string;
+  game_players: { team: Player; guest_id: string | null; left_at: string | null }[];
+}
+
+/**
+ * The public lobby (GET /api/games): every "waiting" game that still has at least one
+ * unclaimed seat and hasn't hit its join TTL. No board state or codes go out here — a
+ * code stays the private way to reach a game not meant to be publicly listed.
+ */
+export async function listOpenGames(): Promise<OpenGameSummary[]> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("games")
+    .select("id, board_size, max_players, komi, extension_bombs, extension_stars, created_at, game_players(team, guest_id, left_at)")
+    .eq("status", "waiting")
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false })
+    .limit(OPEN_GAMES_LIMIT);
+  if (error) throw Errors.serverError();
+
+  const rows = (data ?? []) as unknown as OpenGameRow[];
+  return rows
+    .filter((row) => row.game_players.some((p) => p.guest_id === null))
+    .map((row) => ({
+      id: row.id,
+      boardSize: row.board_size as BoardSize,
+      maxPlayers: row.max_players,
+      komi: row.komi,
+      extensions: { bombs: row.extension_bombs, stars: row.extension_stars },
+      blackCount: row.game_players.filter((p) => p.team === "black" && p.guest_id !== null && p.left_at === null).length,
+      whiteCount: row.game_players.filter((p) => p.team === "white" && p.guest_id !== null && p.left_at === null).length,
+      createdAt: row.created_at,
+    }));
 }
 
 export interface CreateGameInput {
