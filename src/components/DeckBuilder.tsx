@@ -9,9 +9,11 @@ const TURN_LABEL = { black: "Negras", white: "Blancas" } as const;
 
 interface DeckBuilderProps {
   onBack: () => void;
+  /** True when the player got here because they tried to play without a deck yet. */
+  requiredNotice?: boolean;
 }
 
-export default function DeckBuilder({ onBack }: DeckBuilderProps) {
+export default function DeckBuilder({ onBack, requiredNotice }: DeckBuilderProps) {
   const { collection, deckIds, deckCount, maxDeckSize, toggleCard } = useCardCollection();
 
   const groups = useMemo(() => {
@@ -37,6 +39,10 @@ export default function DeckBuilder({ onBack }: DeckBuilderProps) {
           Tienes {collection.length} cartas. Elige hasta {maxDeckSize} para tu baraja.
         </p>
       </header>
+
+      {requiredNotice && (
+        <p className="error-banner">Necesitas elegir al menos una carta para tu baraja antes de poder jugar.</p>
+      )}
 
       <div className="deck-builder-status">
         <span className={`deck-count ${deckFull ? "deck-count-full" : ""}`}>

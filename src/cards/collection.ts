@@ -63,3 +63,10 @@ export function getSavedDeck(ownedIds: Set<string>): Set<string> {
 export function saveDeck(deckIds: Set<string>): void {
   writeIdList(DECK_STORAGE_KEY, Array.from(deckIds));
 }
+
+/** Whether this player has picked at least one card for their deck yet -- used to require
+ * building a deck before "Jugar" instead of silently falling back to the whole collection. */
+export function hasSavedDeck(): boolean {
+  const ownedIds = new Set(getOrCreateCollection().map((c) => c.id));
+  return getSavedDeck(ownedIds).size > 0;
+}

@@ -11,6 +11,7 @@ import OnlineGameScreen from "./components/OnlineGameScreen";
 import CardsMenu from "./components/CardsMenu";
 import DeckBuilder from "./components/DeckBuilder";
 import CardsPlay from "./components/CardsPlay";
+import { hasSavedDeck } from "./cards/collection";
 import type { AiDifficulty, BoardSize, ExtensionRules, Player, TeamRoster } from "./types/game";
 import "./App.css";
 
@@ -65,6 +66,7 @@ export default function App() {
   const [aiConfig, setAiConfig] = useState<AiConfig | null>(null);
   const [onlineGameId, setOnlineGameId] = useState<string | null>(() => readGameIdFromUrl());
   const [inviteToken] = useState<string | null>(() => readInviteTokenFromUrl());
+  const [deckRequiredNotice, setDeckRequiredNotice] = useState(false);
 
   useEffect(() => {
     const onPopState = () => {
@@ -174,15 +176,33 @@ export default function App() {
     return (
       <CardsMenu
         onCancel={() => setScreen("home")}
-        onPlay={() => setScreen("cards-play")}
-        onChooseDeck={() => setScreen("deck-builder")}
+        onPlay={() => {
+          if (hasSavedDeck()) {
+            setScreen("cards-play");
+          } else {
+            setDeckRequiredNotice(true);
+            setScreen("deck-builder");
+          }
+        }}
+        onChooseDeck={() => {
+          setDeckRequiredNotice(false);
+          setScreen("deck-builder");
+        }}
         onBuy={() => {}}
       />
     );
   }
 
   if (screen === "deck-builder") {
-    return <DeckBuilder onBack={() => setScreen("cards-menu")} />;
+    return (
+      <DeckBuilder
+        onBack={() => {
+          setDeckRequiredNotice(false);
+          setScreen("cards-menu");
+        }}
+        requiredNotice={deckRequiredNotice}
+      />
+    );
   }
 
   if (screen === "cards-play") {

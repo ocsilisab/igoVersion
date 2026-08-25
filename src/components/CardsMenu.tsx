@@ -1,3 +1,5 @@
+import { useState } from "react";
+import CardsTutorialModal from "./CardsTutorialModal";
 import "./GameSetup.css";
 import "./HomeScreen.css";
 
@@ -8,17 +10,24 @@ interface CardsMenuProps {
   onCancel: () => void;
 }
 
-/** Menu shell for the (not yet implemented) card game -- buttons don't do anything yet. */
 export default function CardsMenu({ onPlay, onChooseDeck, onBuy, onCancel }: CardsMenuProps) {
+  const [showTutorial, setShowTutorial] = useState(false);
+
   return (
     <div className="setup-screen">
+      <button className="tutorial-btn" onClick={() => setShowTutorial(true)}>
+        Tutorial
+      </button>
+
+      {showTutorial && <CardsTutorialModal onClose={() => setShowTutorial(false)} />}
+
       <div className="setup-content">
         <button className="link-button" onClick={onCancel}>
           ← Inicio
         </button>
 
         <h1 className="setup-title">Cartas</h1>
-        <p className="setup-subtitle">Próximamente.</p>
+        <p className="setup-subtitle">Resuelve problemas de Go contra otro jugador antes que él. "Comprar" todavía no está disponible.</p>
 
         <div className="home-buttons">
           <button className="home-btn home-btn-primary" onClick={onPlay}>
