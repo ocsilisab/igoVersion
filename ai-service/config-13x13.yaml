@@ -1,0 +1,40 @@
+# Configuracion para el modelo de 13x13 -- misma fuente y enfoque que config-9x9.yaml
+# (ver ese archivo para el porque de usar OGS en vez de Fox Go Server).
+#
+# Fuente: https://archive.org/details/ogs2021, sgfs-by-date.tar.gz. Ya extraido en
+# ai-service/data/raw/ogs/sgfs-by-date/ (reutilizado del entrenamiento de 9x9).
+
+dataset:
+  source: "https://archive.org/details/ogs2021 (sgfs-by-date.tar.gz)"
+  board_size: 13
+  # SGF BR/WR numeric scale (sgf_utils.py::rank_to_numeric): -5.0 = 5 kyu, same bar as
+  # 9x9's config-9x9.yaml, for a consistent quality floor across sizes. Measured
+  # empirically (400k-file sample): 13x13 games are themselves rarer on OGS than 9x9
+  # (~12.6% of files here vs 9x9's ~33%), and only ~1.85% of those meet 5 kyu+ (vs 9x9's
+  # much higher qualify rate) -- extrapolated to the full ~27M-file corpus, that's only
+  # ~63k qualifying games, a real ~5x smaller pool than 9x9's ~331k, not an artifact of
+  # the threshold (dan level, >=1.0, is far worse: an estimated ~3.5k games total).
+  # max_games is set below that ~63k estimate rather than kept at 9x9's 300000, so the
+  # job stops once it exhausts the real supply instead of scanning the full corpus
+  # hunting for games that don't exist.
+  min_rank: -5.0
+  max_games: 60000
+  max_positions_per_game: 60
+
+model:
+  board_size: 13
+  input_channels: 6
+  residual_channels: 64
+  residual_blocks: 6
+  # num_labels intentionally omitted -- auto-derives to board_size^2 + 1 = 170 (see
+  # model.py::PolicyNetwork), so it can never drift out of sync with board_size here.
+
+training:
+  batch_size: 256
+  epochs: 30
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  mixed_precision: true
+  early_stopping:
+    enabled: true
+    patience: 5
