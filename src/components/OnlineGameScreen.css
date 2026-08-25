@@ -92,6 +92,22 @@
   align-items: center;
 }
 
+.online-other-games {
+  width: 100%;
+  max-width: 420px;
+  text-align: left;
+  margin-top: 12px;
+}
+
+.online-other-games h2 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
 .online-join-panel .setup-input {
   width: 220px;
 }

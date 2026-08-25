@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { BoardSize, ExtensionRules, Player, TeamRoster } from "../types/game";
 import { DEFAULT_KOMI, MIN_TOTAL_PLAYERS, MAX_TOTAL_PLAYERS, NO_EXTENSIONS } from "../types/game";
-import type { OpenGameSummary } from "../online/types";
 import { assignSeatTeams } from "../online/teamAssignment";
-import { createOnlineGame, joinOnlineGame, joinOnlineGameById, listOpenGames, OnlineApiError } from "../online/api";
+import { createOnlineGame, joinOnlineGame, joinOnlineGameById, OnlineApiError } from "../online/api";
+import { useOpenGames } from "../online/useOpenGames";
 import KomiSelector from "./KomiSelector";
 import TeamSplitPreview from "./TeamSplitPreview";
 import ExtensionsSelector from "./ExtensionsSelector";
+import OpenGamesPanel from "./OpenGamesPanel";
 import "./GameSetup.css";
 import "./CreateOnlineGame.css";
 
@@ -16,7 +17,6 @@ interface CreateOnlineGameProps {
 }
 
 const BOARD_SIZES: BoardSize[] = [9, 13, 19];
-const OPEN_GAMES_POLL_MS = 4000;
 
 export default function CreateOnlineGame({ onCancel, onEntered }: CreateOnlineGameProps) {
   const [boardSize, setBoardSize] = useState<BoardSize>(9);
@@ -28,36 +28,13 @@ export default function CreateOnlineGame({ onCancel, onEntered }: CreateOnlineGa
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [openGames, setOpenGames] = useState<OpenGameSummary[]>([]);
-  const [loadingGames, setLoadingGames] = useState(true);
+  const { games: openGames, loading: loadingGames } = useOpenGames();
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [joinError, setJoinError] = useState<string | null>(null);
 
   const [showCodeEntry, setShowCodeEntry] = useState(false);
   const [codeInput, setCodeInput] = useState("");
   const [isJoiningByCode, setIsJoiningByCode] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const refresh = () => {
-      listOpenGames()
-        .then((res) => {
-          if (!cancelled) setOpenGames(res.games);
-        })
-        .catch(() => {
-          // Transient — the next poll retries; the panel just keeps showing the last list.
-        })
-        .finally(() => {
-          if (!cancelled) setLoadingGames(false);
-        });
-    };
-    refresh();
-    const interval = window.setInterval(refresh, OPEN_GAMES_POLL_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, []);
 
   const teamsPreview = useMemo<TeamRoster>(() => {
     const seatTeams = assignSeatTeams(creatorColor, maxPlayers);
@@ -221,35 +198,14 @@ export default function CreateOnlineGame({ onCancel, onEntered }: CreateOnlineGa
         <section className="setup-section">
           <h2>Partidas abiertas</h2>
 
-          {openGames.length === 0 ? (
-            <p className="setup-hint">
-              {loadingGames ? "Buscando partidas…" : "No hay partidas abiertas ahora mismo. Crea una para empezar."}
-            </p>
-          ) : (
-            <div className="open-games-list">
-              {openGames.map((g) => (
-                <div className="open-game-row" key={g.id}>
-                  <div className="open-game-info">
-                    <span className="open-game-size">
-                      {g.boardSize} × {g.boardSize}
-                    </span>
-                    <span className="open-game-meta">
-                      {g.blackCount + g.whiteCount}/{g.maxPlayers} jugadores · Komi {g.komi}
-                      {g.extensions.bombs ? " · Bombas" : ""}
-                      {g.extensions.stars ? " · Estrellas" : ""}
-                    </span>
-                  </div>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => void handleJoinGame(g.id)}
-                    disabled={busy}
-                  >
-                    {joiningId === g.id ? "Uniéndose…" : "Unirse"}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          <OpenGamesPanel
+            games={openGames}
+            loading={loadingGames}
+            joiningId={joiningId}
+            onJoin={(id) => void handleJoinGame(id)}
+            disabled={busy}
+            emptyHint="No hay partidas abiertas ahora mismo. Crea una para empezar."
+          />
 
           <button
             type="button"

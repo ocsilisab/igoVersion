@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useOnlineGame } from "../online/useOnlineGame";
 import { activeRoster, getActivePlayer, rosterNames } from "../online/turns";
-import { createOnlineGame, OnlineApiError } from "../online/api";
+import { createOnlineGame, joinOnlineGameById, OnlineApiError } from "../online/api";
+import { useOpenGames } from "../online/useOpenGames";
 import type { OnlinePlayer, PendingSeat } from "../online/types";
 import { calculateScore, removeDeadStones } from "../utils/scoring";
 import GoBoard from "./GoBoard";
 import GameInfo from "./GameInfo";
+import OpenGamesPanel from "./OpenGamesPanel";
 import ConfirmModal from "./ConfirmModal";
 import GameOverModal from "./GameOverModal";
 import "./GameScreen.css";
@@ -18,6 +20,8 @@ interface OnlineGameScreenProps {
   onExit: () => void;
   /** Creates a fresh game with the same settings and takes this browser into its waiting room. */
   onRematch: (newGameId: string) => void;
+  /** Leaves the current (still-waiting) game and takes this browser into a different one. */
+  onJoinAnother: (gameId: string) => void;
 }
 
 function gameUrl(gameId: string): string {
@@ -54,7 +58,7 @@ function PendingSeatRow({
   );
 }
 
-export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematch }: OnlineGameScreenProps) {
+export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematch, onJoinAnother }: OnlineGameScreenProps) {
   const {
     game,
     you,
@@ -81,7 +85,11 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
   const [isJoining, setIsJoining] = useState(false);
   const [rematching, setRematching] = useState(false);
   const [rematchError, setRematchError] = useState<string | null>(null);
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
   const autoJoinAttempted = useRef(false);
+
+  const { games: openGames, loading: loadingOpenGames } = useOpenGames(gameId);
 
   // A personal invite link: claim that seat automatically, then drop the token from the
   // URL so a refresh doesn't try (harmlessly, but pointlessly) to reclaim it.
@@ -185,6 +193,22 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
     setIsJoining(true);
     await join({ displayName: joinName.trim() || undefined });
     setIsJoining(false);
+  };
+
+  /** Picking another open game while still waiting on this one: leave this one first (frees
+   * your seat, or cancels it outright if you're the creator — same as the "Cancelar
+   * partida"/"Salir" button), then join the one just picked. */
+  const handleSwitchGame = async (targetId: string) => {
+    setSwitchingId(targetId);
+    setSwitchError(null);
+    try {
+      await leave();
+      const { game: joined } = await joinOnlineGameById(targetId, you?.displayName);
+      onJoinAnother(joined.id);
+    } catch (err) {
+      setSwitchError(err instanceof OnlineApiError ? err.message : "No se ha podido unir a esa partida.");
+      setSwitchingId(null);
+    }
   };
 
   if (game.status === "waiting") {
@@ -292,6 +316,21 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
               </button>
             </div>
           )
+        )}
+
+        {isMember && (
+          <section className="online-other-games">
+            <h2>Otras partidas abiertas</h2>
+            <OpenGamesPanel
+              games={openGames}
+              loading={loadingOpenGames}
+              joiningId={switchingId}
+              onJoin={(id) => void handleSwitchGame(id)}
+              disabled={switchingId !== null}
+              emptyHint="No hay otras partidas abiertas ahora mismo."
+            />
+            {switchError && <p className="error-banner">{switchError}</p>}
+          </section>
         )}
       </div>
     );

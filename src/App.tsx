@@ -156,7 +156,15 @@ export default function App() {
   }
 
   if (screen === "online-game" && onlineGameId) {
-    return <OnlineGameScreen gameId={onlineGameId} inviteToken={inviteToken} onExit={goHome} onRematch={enterOnlineGame} />;
+    return (
+      <OnlineGameScreen
+        gameId={onlineGameId}
+        inviteToken={inviteToken}
+        onExit={goHome}
+        onRematch={enterOnlineGame}
+        onJoinAnother={enterOnlineGame}
+      />
+    );
   }
 
   if (screen === "cards-menu") {
