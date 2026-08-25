@@ -6,9 +6,10 @@ interface HomeScreenProps {
   onPlaySolo: () => void;
   onPlayAi: () => void;
   onPlayOnline: () => void;
+  onPlayCards: () => void;
 }
 
-export default function HomeScreen({ onPlaySolo, onPlayAi, onPlayOnline }: HomeScreenProps) {
+export default function HomeScreen({ onPlaySolo, onPlayAi, onPlayOnline, onPlayCards }: HomeScreenProps) {
   const [showTutorial, setShowTutorial] = useState(false);
 
   return (
@@ -37,6 +38,10 @@ export default function HomeScreen({ onPlaySolo, onPlayAi, onPlayOnline }: HomeS
 
           <button className="home-btn" onClick={onPlayOnline}>
             Jugar online
+          </button>
+
+          <button className="home-btn" onClick={onPlayCards}>
+            Jugar cartas
           </button>
         </div>
       </div>

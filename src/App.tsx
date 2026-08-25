@@ -8,6 +8,7 @@ import OnlineSetup from "./components/OnlineSetup";
 import CreateOnlineGame from "./components/CreateOnlineGame";
 import JoinOnlineGame from "./components/JoinOnlineGame";
 import OnlineGameScreen from "./components/OnlineGameScreen";
+import CardsMenu from "./components/CardsMenu";
 import type { AiDifficulty, BoardSize, ExtensionRules, Player, TeamRoster } from "./types/game";
 import "./App.css";
 
@@ -20,7 +21,8 @@ type Screen =
   | "online-setup"
   | "online-create"
   | "online-join"
-  | "online-game";
+  | "online-game"
+  | "cards-menu";
 
 interface SoloConfig {
   boardSize: BoardSize;
@@ -92,6 +94,7 @@ export default function App() {
         onPlaySolo={() => setScreen("solo-setup")}
         onPlayAi={() => setScreen("ai-setup")}
         onPlayOnline={() => setScreen("online-setup")}
+        onPlayCards={() => setScreen("cards-menu")}
       />
     );
   }
@@ -160,6 +163,11 @@ export default function App() {
 
   if (screen === "online-game" && onlineGameId) {
     return <OnlineGameScreen gameId={onlineGameId} inviteToken={inviteToken} onExit={goHome} />;
+  }
+
+  if (screen === "cards-menu") {
+    // Not implemented yet -- Jugar/Elegir baraja/Comprar are just placeholders for now.
+    return <CardsMenu onCancel={() => setScreen("home")} onPlay={() => {}} onChooseDeck={() => {}} onBuy={() => {}} />;
   }
 
   return null;
