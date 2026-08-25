@@ -189,3 +189,48 @@ create index if not exists rate_limit_hits_lookup on rate_limit_hits (ip_hash, a
 
 alter table rate_limit_hits enable row level security;
 -- No policies at all: only the service role touches this table.
+
+-- ---------------------------------------------------------------------------
+-- card_games
+-- ---------------------------------------------------------------------------
+-- Pairing for the (still rule-less) card game's "Jugar" flow: whoever clicks Jugar
+-- becomes the host and gets a code to share; whoever enters that code becomes the
+-- guest, which flips status to 'ready' for both sides. Deliberately its own table,
+-- unrelated to games/game_players above -- no board, no turns, nothing Go-specific.
+
+create table if not exists card_games (
+  id uuid primary key default gen_random_uuid(),
+  code text not null,
+  version integer not null default 0,
+  host_guest_id text not null,
+  host_name text not null,
+  guest_guest_id text,
+  guest_name text,
+  status text not null default 'waiting' check (status in ('waiting', 'ready', 'abandoned')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  -- Only meaningful while status = 'waiting'; same expiry idea as games.expires_at.
+  expires_at timestamptz not null default (now() + interval '20 minutes')
+);
+
+create unique index if not exists card_games_code_key on card_games (code);
+create index if not exists card_games_status_idx on card_games (status);
+
+alter table card_games enable row level security;
+
+drop policy if exists "Public read access" on card_games;
+create policy "Public read access" on card_games
+  for select
+  using (true);
+
+-- Same reasoning as games: only the service role (the /api routes) can write.
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'card_games'
+  ) then
+    alter publication supabase_realtime add table card_games;
+  end if;
+end $$;
