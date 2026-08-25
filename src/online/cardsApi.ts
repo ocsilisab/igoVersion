@@ -33,14 +33,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export function createCardGame(displayName?: string): Promise<CardGameResponse> {
   return request<CardGameResponse>("/api/cards/games", {
     method: "POST",
-    body: JSON.stringify({ displayName }),
+    body: JSON.stringify({ action: "create", displayName }),
   });
 }
 
 export function joinCardGame(code: string, displayName?: string): Promise<CardGameResponse> {
-  return request<CardGameResponse>("/api/cards/games/join", {
+  return request<CardGameResponse>("/api/cards/games", {
     method: "POST",
-    body: JSON.stringify({ code, displayName }),
+    body: JSON.stringify({ action: "join", code, displayName }),
   });
 }
 
@@ -49,15 +49,15 @@ export function fetchCardGame(id: string): Promise<CardGameResponse> {
 }
 
 export function submitCardHand(id: string, deckIds: string[]): Promise<CardGameResponse> {
-  return request<CardGameResponse>(`/api/cards/games/${id}/hand`, {
+  return request<CardGameResponse>(`/api/cards/games/${id}`, {
     method: "POST",
-    body: JSON.stringify({ deckIds }),
+    body: JSON.stringify({ action: "hand", deckIds }),
   });
 }
 
 export function submitCardAnswer(id: string, row: number, col: number): Promise<CardGameResponse> {
-  return request<CardGameResponse>(`/api/cards/games/${id}/answer`, {
+  return request<CardGameResponse>(`/api/cards/games/${id}`, {
     method: "POST",
-    body: JSON.stringify({ row, col }),
+    body: JSON.stringify({ action: "answer", row, col }),
   });
 }

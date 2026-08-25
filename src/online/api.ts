@@ -61,15 +61,15 @@ export function joinOnlineGame(code: string, displayName?: string): Promise<Game
 
 /** The generic per-game link (`?game=<id>`, no invite token). */
 export function joinOnlineGameById(id: string, displayName?: string): Promise<GameResponse> {
-  return request<GameResponse>(`/api/games/${id}/join`, {
+  return request<GameResponse>(`/api/games/${id}`, {
     method: "POST",
-    body: JSON.stringify({ displayName }),
+    body: JSON.stringify({ action: "join", displayName }),
   });
 }
 
 /** A specific player's personal invite link (`?game=<id>&token=<token>`). */
 export function joinOnlineGameByToken(token: string, displayName?: string): Promise<GameResponse> {
-  return request<GameResponse>("/api/games/join-by-token", {
+  return request<GameResponse>("/api/games/join", {
     method: "POST",
     body: JSON.stringify({ token, displayName }),
   });
@@ -102,9 +102,9 @@ export function sendFinalize(id: string): Promise<GameMutationResponse> {
 }
 
 export function sendLeave(id: string): Promise<GameMutationResponse> {
-  return request<GameMutationResponse>(`/api/games/${id}/leave`, { method: "POST" });
+  return request<GameMutationResponse>(`/api/games/${id}`, { method: "POST", body: JSON.stringify({ action: "leave" }) });
 }
 
 export function sendStart(id: string): Promise<GameMutationResponse> {
-  return request<GameMutationResponse>(`/api/games/${id}/start`, { method: "POST" });
+  return request<GameMutationResponse>(`/api/games/${id}`, { method: "POST", body: JSON.stringify({ action: "start" }) });
 }
