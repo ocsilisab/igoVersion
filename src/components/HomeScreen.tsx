@@ -1,3 +1,5 @@
+import { useState } from "react";
+import TutorialModal from "./TutorialModal";
 import "./HomeScreen.css";
 
 interface HomeScreenProps {
@@ -7,8 +9,16 @@ interface HomeScreenProps {
 }
 
 export default function HomeScreen({ onPlaySolo, onPlayAi, onPlayOnline }: HomeScreenProps) {
+  const [showTutorial, setShowTutorial] = useState(false);
+
   return (
     <div className="home-screen">
+      <button className="tutorial-btn" onClick={() => setShowTutorial(true)}>
+        Tutorial
+      </button>
+
+      {showTutorial && <TutorialModal onClose={() => setShowTutorial(false)} />}
+
       <div className="home-content">
         <h1 className="home-title">碁 Go</h1>
         <p className="home-subtitle">

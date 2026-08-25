@@ -1,0 +1,68 @@
+.rule-diagram {
+  margin: 0;
+  width: 140px;
+  flex-shrink: 0;
+}
+
+.rule-diagram-svg {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: block;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.rule-diagram-bg {
+  fill: var(--board-color);
+}
+
+.rule-diagram-line {
+  stroke: var(--board-line);
+  stroke-width: 0.6;
+  vector-effect: non-scaling-stroke;
+}
+
+.rule-diagram-stone-black {
+  fill: var(--stone-black);
+}
+
+.rule-diagram-stone-white {
+  fill: var(--stone-white);
+  stroke: var(--stone-white-lo);
+  stroke-width: 0.5;
+}
+
+.rule-diagram-dead-marker line {
+  stroke: var(--danger);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.rule-diagram-liberty {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.2;
+}
+
+.rule-diagram-territory {
+  pointer-events: none;
+}
+
+.rule-diagram-territory-black {
+  fill: var(--stone-black);
+  opacity: 0.75;
+}
+
+.rule-diagram-territory-white {
+  fill: var(--stone-white);
+  stroke: var(--stone-white-lo);
+  stroke-width: 0.3;
+  opacity: 0.85;
+}
+
+.rule-diagram figcaption {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 6px;
+}

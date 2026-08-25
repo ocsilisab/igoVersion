@@ -1,9 +1,30 @@
 .home-screen {
+  position: relative;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
+}
+
+.tutorial-btn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.tutorial-btn:hover {
+  border-color: var(--text-muted);
 }
 
 .home-content {
