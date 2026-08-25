@@ -62,25 +62,34 @@
 
 .deck-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
 }
 
 .tesuji-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
-  gap: 4px;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
   font-family: inherit;
-  padding: 12px 14px 12px 30px;
+  padding: 12px 10px;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.tesuji-card-diagram {
+  width: 100%;
+  max-width: 120px;
+}
+
+.tesuji-card-diagram .rule-diagram {
+  width: 100%;
 }
 
 .tesuji-card:hover:not(:disabled) {

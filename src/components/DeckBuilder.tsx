@@ -2,7 +2,10 @@ import { useMemo } from "react";
 import { useCardCollection } from "../hooks/useCardCollection";
 import { RANK_LEVELS } from "../cards/types";
 import type { TesujiCard } from "../cards/types";
+import RuleDiagram from "./RuleDiagram";
 import "./DeckBuilder.css";
+
+const TURN_LABEL = { black: "Negras", white: "Blancas" } as const;
 
 interface DeckBuilderProps {
   onBack: () => void;
@@ -59,8 +62,13 @@ export default function DeckBuilder({ onBack }: DeckBuilderProps) {
                     title={card.description}
                   >
                     <span className="tesuji-card-check">{selected ? "✓" : ""}</span>
+                    <div className="tesuji-card-diagram">
+                      <RuleDiagram size={card.problem.boardSize} stones={card.problem.stones} />
+                    </div>
                     <span className="tesuji-card-name">{card.name}</span>
-                    <span className="tesuji-card-desc">{card.description}</span>
+                    <span className="tesuji-card-desc">
+                      Turno: {TURN_LABEL[card.problem.toPlay]}. {card.problem.prompt}
+                    </span>
                   </button>
                 );
               })}
