@@ -1,0 +1,123 @@
+.deck-builder {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.deck-builder-header {
+  margin-bottom: 16px;
+}
+
+.deck-builder-title {
+  font-size: 1.8rem;
+  margin: 12px 0 4px;
+}
+
+.deck-builder-subtitle {
+  margin: 0;
+}
+
+.deck-builder-status {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg);
+  padding: 10px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.deck-count {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.deck-count-full {
+  color: var(--danger);
+}
+
+.deck-saved-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.deck-builder-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding-bottom: 24px;
+}
+
+.deck-rank-heading {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+.deck-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.tesuji-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 4px;
+  font-family: inherit;
+  padding: 12px 14px 12px 30px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.tesuji-card:hover:not(:disabled) {
+  border-color: var(--text-muted);
+}
+
+.tesuji-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.tesuji-card-selected {
+  border-color: var(--accent);
+  background: var(--accent-bg, rgba(47, 111, 82, 0.1));
+}
+
+.tesuji-card-selected:hover {
+  border-color: var(--accent);
+}
+
+.tesuji-card-check {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.tesuji-card-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.tesuji-card-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
