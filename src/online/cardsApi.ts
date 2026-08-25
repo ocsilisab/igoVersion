@@ -47,3 +47,17 @@ export function joinCardGame(code: string, displayName?: string): Promise<CardGa
 export function fetchCardGame(id: string): Promise<CardGameResponse> {
   return request<CardGameResponse>(`/api/cards/games/${id}`);
 }
+
+export function submitCardHand(id: string, deckIds: string[]): Promise<CardGameResponse> {
+  return request<CardGameResponse>(`/api/cards/games/${id}/hand`, {
+    method: "POST",
+    body: JSON.stringify({ deckIds }),
+  });
+}
+
+export function submitCardAnswer(id: string, row: number, col: number): Promise<CardGameResponse> {
+  return request<CardGameResponse>(`/api/cards/games/${id}/answer`, {
+    method: "POST",
+    body: JSON.stringify({ row, col }),
+  });
+}

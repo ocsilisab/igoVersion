@@ -38,6 +38,22 @@
   stroke-linecap: round;
 }
 
+.rule-diagram-wrong-marker line {
+  stroke: var(--danger);
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+
+.rule-diagram-hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.rule-diagram-hit:hover {
+  fill: rgba(0, 0, 0, 0.08);
+}
+
 .rule-diagram-liberty {
   fill: none;
   stroke: var(--accent);

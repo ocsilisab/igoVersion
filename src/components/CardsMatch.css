@@ -1,0 +1,42 @@
+.cards-match {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.cards-match-status {
+  display: flex;
+  gap: 24px;
+  font-weight: 600;
+}
+
+.cards-match-timer {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.cards-match-prompt {
+  max-width: 320px;
+  text-align: center;
+  margin: 0;
+}
+
+.cards-match-mistakes {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.cards-match-result {
+  text-align: center;
+}
+
+.cards-match-result h2 {
+  margin-bottom: 8px;
+}
+
+.cards-match-result p {
+  margin: 4px 0;
+}

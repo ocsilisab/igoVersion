@@ -193,10 +193,14 @@ alter table rate_limit_hits enable row level security;
 -- ---------------------------------------------------------------------------
 -- card_games
 -- ---------------------------------------------------------------------------
--- Pairing for the (still rule-less) card game's "Jugar" flow: whoever clicks Jugar
--- becomes the host and gets a code to share; whoever enters that code becomes the
--- guest, which flips status to 'ready' for both sides. Deliberately its own table,
--- unrelated to games/game_players above -- no board, no turns, nothing Go-specific.
+-- Pairing *and* the match itself for the card game's "Jugar" flow: whoever clicks Jugar
+-- becomes the host and gets a code to share; whoever enters that code becomes the guest,
+-- which flips status to 'ready'. Once both have submitted a hand (see hand.ts), status
+-- becomes 'playing' and a race starts: each side answers their own 5-card hand, the
+-- server checks every answer against that card's real solution (src/cards/tesujiCards.ts,
+-- reused as-is from Node -- it has no browser-only dependencies), and whoever's progress
+-- first reaches 5 wins outright, ending the match for both. Deliberately its own table,
+-- unrelated to games/game_players above -- no board/turns in the Go sense.
 
 create table if not exists card_games (
   id uuid primary key default gen_random_uuid(),
@@ -206,12 +210,42 @@ create table if not exists card_games (
   host_name text not null,
   guest_guest_id text,
   guest_name text,
-  status text not null default 'waiting' check (status in ('waiting', 'ready', 'abandoned')),
+  status text not null default 'waiting' check (status in ('waiting', 'ready', 'playing', 'finished', 'abandoned')),
+  -- Each a length-5 array of tesuji card ids (see src/cards/tesujiCards.ts), drawn
+  -- server-side with replacement from that player's own submitted deck once they reach
+  -- the 'ready' screen -- see hand.ts. Null until that player has submitted one.
+  host_hand jsonb,
+  guest_hand jsonb,
+  -- How many of their 5 hand cards each side has solved correctly so far, in order --
+  -- the card they're currently on is hand[progress]. First to reach 5 wins.
+  host_progress smallint not null default 0,
+  guest_progress smallint not null default 0,
+  -- Total wrong attempts so far -- purely informational/for the on-screen "+5s" counter,
+  -- doesn't gate anything server-side (a wrong answer doesn't advance progress, so the
+  -- player just has to try that same card again).
+  host_mistakes integer not null default 0,
+  guest_mistakes integer not null default 0,
+  -- Set once both hands exist, i.e. when status flips to 'playing' -- the race's t=0.
+  started_at timestamptz,
+  winner text check (winner in ('host', 'guest')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   -- Only meaningful while status = 'waiting'; same expiry idea as games.expires_at.
   expires_at timestamptz not null default (now() + interval '20 minutes')
 );
+
+-- Migration for a card_games table created before the match itself existed (just
+-- pairing). Safe no-ops if already applied.
+alter table card_games drop constraint if exists card_games_status_check;
+alter table card_games add constraint card_games_status_check check (status in ('waiting', 'ready', 'playing', 'finished', 'abandoned'));
+alter table card_games add column if not exists host_hand jsonb;
+alter table card_games add column if not exists guest_hand jsonb;
+alter table card_games add column if not exists host_progress smallint not null default 0;
+alter table card_games add column if not exists guest_progress smallint not null default 0;
+alter table card_games add column if not exists host_mistakes integer not null default 0;
+alter table card_games add column if not exists guest_mistakes integer not null default 0;
+alter table card_games add column if not exists started_at timestamptz;
+alter table card_games add column if not exists winner text check (winner in ('host', 'guest'));
 
 create unique index if not exists card_games_code_key on card_games (code);
 create index if not exists card_games_status_idx on card_games (status);

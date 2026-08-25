@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCardGame } from "../hooks/useCardGame";
+import { getOrCreateCollection, getSavedDeck } from "../cards/collection";
+import CardsMatch from "./CardsMatch";
 import "./GameSetup.css";
 import "./OnlineGameScreen.css";
 
@@ -7,11 +9,31 @@ interface CardsPlayProps {
   onBack: () => void;
 }
 
+/** This player's chosen deck (up to 50 cards from DeckBuilder), or their whole owned
+ * collection if they never built one -- so the match is still playable either way. */
+function myDeckIds(): string[] {
+  const collection = getOrCreateCollection();
+  const ownedIds = new Set(collection.map((c) => c.id));
+  const deck = getSavedDeck(ownedIds);
+  return deck.size > 0 ? Array.from(deck) : Array.from(ownedIds);
+}
+
 export default function CardsPlay({ onBack }: CardsPlayProps) {
-  const { game, isHost, loading, error, joinByCode, clearError } = useCardGame();
+  const { game, isHost, loading, error, joinByCode, submitHand, submitAnswer, clearError } = useCardGame();
   const [codeInput, setCodeInput] = useState("");
   const [copied, setCopied] = useState(false);
   const [joining, setJoining] = useState(false);
+  const handSubmittedFor = useRef<string | null>(null);
+
+  // As soon as both sides are connected, hand over this player's deck so the server can
+  // deal their hand -- no extra button, matches the rest of the flow's "it just starts".
+  useEffect(() => {
+    if (!game || game.status !== "ready") return;
+    const myHand = isHost ? game.hostHand : game.guestHand;
+    if (myHand || handSubmittedFor.current === game.id) return;
+    handSubmittedFor.current = game.id;
+    void submitHand(myDeckIds());
+  }, [game, isHost, submitHand]);
 
   const handleCopyCode = async () => {
     if (!game) return;
@@ -40,9 +62,8 @@ export default function CardsPlay({ onBack }: CardsPlayProps) {
     );
   }
 
-  const opponentName = game && (isHost ? game.guestName : game.hostName);
   const yourName = game && (isHost ? game.hostName : game.guestName);
-  const connected = game?.status === "ready";
+  const inMatch = game?.status === "playing" || game?.status === "finished";
 
   return (
     <div className="online-status-screen">
@@ -52,13 +73,10 @@ export default function CardsPlay({ onBack }: CardsPlayProps) {
 
       <h1 className="setup-title">Jugar</h1>
 
-      {connected ? (
-        <>
-          <p>
-            Conectado con <strong>{opponentName}</strong>.
-          </p>
-          <p className="online-waiting">El juego de cartas está en construcción — pronto podréis jugar de verdad.</p>
-        </>
+      {game && inMatch ? (
+        <CardsMatch game={game} isHost={isHost} onAnswer={submitAnswer} />
+      ) : game?.status === "ready" ? (
+        <p className="online-waiting">Repartiendo cartas…</p>
       ) : (
         <>
           <p className="setup-subtitle">
@@ -98,7 +116,7 @@ export default function CardsPlay({ onBack }: CardsPlayProps) {
 
       {error && <p className="error-banner">{error}</p>}
 
-      {!connected && yourName && <p className="online-waiting">Tú: {yourName}</p>}
+      {!inMatch && yourName && <p className="online-waiting">Tú: {yourName}</p>}
     </div>
   );
 }

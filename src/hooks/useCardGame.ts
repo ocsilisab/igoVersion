@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { CardGame } from "../online/cardGameTypes.js";
-import { CardsApiError, createCardGame, fetchCardGame, joinCardGame } from "../online/cardsApi.js";
+import { CardsApiError, createCardGame, fetchCardGame, joinCardGame, submitCardAnswer, submitCardHand } from "../online/cardsApi.js";
 import { getSupabaseBrowserClient } from "../online/supabaseClient.js";
 
 const POLL_INTERVAL_MS = 3000;
@@ -14,6 +14,10 @@ export interface UseCardGameResult {
   error: string | null;
   /** Enters a code shared by the other player; on success this browser switches to that session. */
   joinByCode: (code: string) => Promise<void>;
+  /** Submits this player's deck once the session is 'ready', so the server can draw their hand. */
+  submitHand: (deckIds: string[]) => Promise<void>;
+  /** Answers the player's current hand card. */
+  submitAnswer: (row: number, col: number) => Promise<boolean>;
   clearError: () => void;
 }
 
@@ -104,5 +108,38 @@ export function useCardGame(): UseCardGameResult {
     }
   }, []);
 
-  return { game, isHost, loading, error, joinByCode, clearError: () => setError(null) };
+  const submitHand = useCallback(async (deckIds: string[]) => {
+    const id = gameIdRef.current;
+    if (!id) return;
+    setError(null);
+    try {
+      const res = await submitCardHand(id, deckIds);
+      setGame(res.game);
+      setIsHost(res.isHost);
+    } catch (err) {
+      setError(err instanceof CardsApiError ? err.message : "No se ha podido enviar la baraja.");
+    }
+  }, []);
+
+  const submitAnswer = useCallback(
+    async (row: number, col: number): Promise<boolean> => {
+      const id = gameIdRef.current;
+      if (!id) return false;
+      const prevProgress = isHost ? game?.hostProgress : game?.guestProgress;
+      setError(null);
+      try {
+        const res = await submitCardAnswer(id, row, col);
+        setGame(res.game);
+        setIsHost(res.isHost);
+        const newProgress = res.isHost ? res.game.hostProgress : res.game.guestProgress;
+        return (prevProgress ?? 0) < newProgress;
+      } catch (err) {
+        setError(err instanceof CardsApiError ? err.message : "No se ha podido enviar la respuesta.");
+        return false;
+      }
+    },
+    [game, isHost]
+  );
+
+  return { game, isHost, loading, error, joinByCode, submitHand, submitAnswer, clearError: () => setError(null) };
 }

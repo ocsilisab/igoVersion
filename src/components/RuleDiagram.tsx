@@ -22,14 +22,26 @@ interface RuleDiagramProps {
   /** Empty points to highlight as liberties, with a small ring marker. */
   liberties?: { row: number; col: number }[];
   territory?: DiagramTerritory[];
+  /** Empty points to mark with a red cross -- e.g. a previous wrong guess when solving a problem. */
+  wrongPoints?: { row: number; col: number }[];
   /** Caption shown under the diagram, e.g. "Antes" / "Después". */
   caption?: string;
+  /** When set, every empty point becomes clickable (e.g. for answering a tesuji problem). */
+  onPointClick?: (row: number, col: number) => void;
 }
 
 const VIEW_SIZE = 100;
 const MARGIN = 12;
 
-export default function RuleDiagram({ size, stones = [], liberties = [], territory = [], caption }: RuleDiagramProps) {
+export default function RuleDiagram({
+  size,
+  stones = [],
+  liberties = [],
+  territory = [],
+  wrongPoints = [],
+  caption,
+  onPointClick,
+}: RuleDiagramProps) {
   const step = (VIEW_SIZE - MARGIN * 2) / (size - 1);
   const coord = (i: number) => MARGIN + i * step;
   const stoneAt = (row: number, col: number) => stones.find((s) => s.row === row && s.col === col);
@@ -52,11 +64,23 @@ export default function RuleDiagram({ size, stones = [], liberties = [], territo
             const cx = coord(col);
             const cy = coord(row);
             const stone = stoneAt(row, col);
+            const isEmpty = !stone;
             const isLiberty = liberties.some((l) => l.row === row && l.col === col);
             const owner = territoryAt(row, col)?.color;
+            const isWrongGuess = wrongPoints.some((p) => p.row === row && p.col === col);
+            const clickable = isEmpty && Boolean(onPointClick);
 
             return (
               <g key={`${row}-${col}`}>
+                {clickable && (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={step * 0.48}
+                    className="rule-diagram-hit"
+                    onClick={() => onPointClick!(row, col)}
+                  />
+                )}
                 {stone && (
                   <circle cx={cx} cy={cy} r={step * 0.45} className={`rule-diagram-stone rule-diagram-stone-${stone.color}`} />
                 )}
@@ -64,6 +88,12 @@ export default function RuleDiagram({ size, stones = [], liberties = [], territo
                   <g className="rule-diagram-dead-marker">
                     <line x1={cx - step * 0.22} y1={cy - step * 0.22} x2={cx + step * 0.22} y2={cy + step * 0.22} />
                     <line x1={cx - step * 0.22} y1={cy + step * 0.22} x2={cx + step * 0.22} y2={cy - step * 0.22} />
+                  </g>
+                )}
+                {isWrongGuess && (
+                  <g className="rule-diagram-wrong-marker">
+                    <line x1={cx - step * 0.2} y1={cy - step * 0.2} x2={cx + step * 0.2} y2={cy + step * 0.2} />
+                    <line x1={cx - step * 0.2} y1={cy + step * 0.2} x2={cx + step * 0.2} y2={cy - step * 0.2} />
                   </g>
                 )}
                 {isLiberty && <circle cx={cx} cy={cy} r={step * 0.22} className="rule-diagram-liberty" />}
