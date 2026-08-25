@@ -67,36 +67,72 @@ export default function TutorialModal({ onClose }: TutorialModalProps) {
           </section>
 
           <section className="tutorial-section">
-            <div className="tutorial-diagram-pair">
-              <RuleDiagram
-                size={5}
-                caption="Antes"
-                stones={[
-                  { row: 2, col: 2, color: "black" },
-                  { row: 1, col: 2, color: "white" },
-                  { row: 3, col: 2, color: "white" },
-                  { row: 2, col: 1, color: "white" },
-                ]}
-                liberties={[{ row: 2, col: 3 }]}
-              />
-              <RuleDiagram
-                size={5}
-                caption="Después"
-                stones={[
-                  { row: 2, col: 2, color: "black", dead: true },
-                  { row: 1, col: 2, color: "white" },
-                  { row: 3, col: 2, color: "white" },
-                  { row: 2, col: 1, color: "white" },
-                  { row: 2, col: 3, color: "white" },
-                ]}
-              />
+            <div className="tutorial-diagram-pairs">
+              <div>
+                <p className="tutorial-diagram-pairs-label">Una sola piedra</p>
+                <div className="tutorial-diagram-pair">
+                  <RuleDiagram
+                    size={5}
+                    caption="Antes"
+                    stones={[
+                      { row: 2, col: 2, color: "black" },
+                      { row: 1, col: 2, color: "white" },
+                      { row: 3, col: 2, color: "white" },
+                      { row: 2, col: 1, color: "white" },
+                    ]}
+                    liberties={[{ row: 2, col: 3 }]}
+                  />
+                  <RuleDiagram
+                    size={5}
+                    caption="Después"
+                    stones={[
+                      { row: 2, col: 2, color: "black", dead: true },
+                      { row: 1, col: 2, color: "white" },
+                      { row: 3, col: 2, color: "white" },
+                      { row: 2, col: 1, color: "white" },
+                      { row: 2, col: 3, color: "white" },
+                    ]}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <p className="tutorial-diagram-pairs-label">Un grupo de varias piedras</p>
+                <div className="tutorial-diagram-pair">
+                  <RuleDiagram
+                    size={5}
+                    caption="Antes"
+                    stones={[
+                      { row: 0, col: 1, color: "black" },
+                      { row: 0, col: 2, color: "black" },
+                      { row: 0, col: 0, color: "white" },
+                      { row: 1, col: 1, color: "white" },
+                      { row: 1, col: 2, color: "white" },
+                    ]}
+                    liberties={[{ row: 0, col: 3 }]}
+                  />
+                  <RuleDiagram
+                    size={5}
+                    caption="Después"
+                    stones={[
+                      { row: 0, col: 1, color: "black", dead: true },
+                      { row: 0, col: 2, color: "black", dead: true },
+                      { row: 0, col: 0, color: "white" },
+                      { row: 1, col: 1, color: "white" },
+                      { row: 1, col: 2, color: "white" },
+                      { row: 0, col: 3, color: "white" },
+                    ]}
+                  />
+                </div>
+              </div>
             </div>
             <div className="tutorial-text">
               <h3>Capturas</h3>
               <p>
                 Cuando a un grupo le rodean por completo y se queda sin ninguna libertad, se captura entero de
-                golpe y se retira del tablero. Arriba, a la piedra negra solo le queda una libertad (marcada en
-                verde); en cuanto Blancas juega ahí, Negras se captura.
+                golpe y se retira del tablero — da igual si es una sola piedra o un grupo entero de piedras
+                conectadas, como en los dos ejemplos: a la piedra (o grupo) negra solo le queda una libertad
+                (marcada en verde); en cuanto Blancas juega ahí, todo el grupo negro se captura de golpe.
               </p>
             </div>
           </section>
