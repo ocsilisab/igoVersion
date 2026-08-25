@@ -4,6 +4,9 @@ interface GameOverModalProps {
   score: ScoreResult;
   onPlayAgain: () => void;
   onExit: () => void;
+  /** Overrides the "Jugar de nuevo" button text -- e.g. online games show progress while the rematch is being created. */
+  playAgainLabel?: string;
+  playAgainDisabled?: boolean;
 }
 
 function winnerLabel(score: ScoreResult): string {
@@ -15,7 +18,13 @@ function winnerLabel(score: ScoreResult): string {
  * Rendered inline right after the final board (never a blocking overlay) so the board —
  * still showing every dead group crossed out — stays visible next to the score table.
  */
-export default function GameOverModal({ score, onPlayAgain, onExit }: GameOverModalProps) {
+export default function GameOverModal({
+  score,
+  onPlayAgain,
+  onExit,
+  playAgainLabel = "Jugar de nuevo",
+  playAgainDisabled = false,
+}: GameOverModalProps) {
   return (
     <div className="game-over-panel" role="region" aria-labelledby="game-over-title">
       <h2 id="game-over-title">Partida finalizada</h2>
@@ -62,8 +71,8 @@ export default function GameOverModal({ score, onPlayAgain, onExit }: GameOverMo
         <button className="btn btn-secondary" onClick={onExit}>
           Volver al inicio
         </button>
-        <button className="btn btn-primary" onClick={onPlayAgain}>
-          Jugar de nuevo
+        <button className="btn btn-primary" onClick={onPlayAgain} disabled={playAgainDisabled}>
+          {playAgainLabel}
         </button>
       </div>
     </div>

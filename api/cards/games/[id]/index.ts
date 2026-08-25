@@ -3,7 +3,7 @@ import { withHandler, readBody } from "../../../_lib/http.js";
 import { checkRateLimit } from "../../../_lib/rateLimit.js";
 import { Errors } from "../../../_lib/errors.js";
 import { ensureGuestId, readGuestId } from "../../../_lib/session.js";
-import { findCardGameById, submitAnswer, submitHand } from "../../../_lib/cardGameRepo.js";
+import { findCardGameById, rematchCardGame, submitAnswer, submitHand } from "../../../_lib/cardGameRepo.js";
 
 interface ActionBody {
   action?: string;
@@ -16,9 +16,10 @@ interface ActionBody {
  * GET fetches the current state of a card-game session (initial load, reload recovery,
  * Realtime/polling refresh). POST {action: "hand", deckIds} submits this player's deck
  * so the server can draw their 5-card hand; POST {action: "answer", row, col} answers
- * their current hand card, checked server-side against its real solution. Merged into
- * one file (rather than separate hand.ts/answer.ts) to stay under Vercel Hobby's
- * 12-serverless-function-per-deployment cap.
+ * their current hand card, checked server-side against its real solution. POST
+ * {action: "rematch"} resets a finished match back to 'ready' for the same two players.
+ * Merged into one file (rather than separate hand.ts/answer.ts/rematch.ts) to stay under
+ * Vercel Hobby's 12-serverless-function-per-deployment cap.
  */
 export default withHandler(["GET", "POST"], async (req: VercelRequest, res: VercelResponse) => {
   const { id } = req.query;
@@ -54,6 +55,15 @@ export default withHandler(["GET", "POST"], async (req: VercelRequest, res: Verc
     }
     const guestId = ensureGuestId(req, res);
     const { game, isHost } = await submitAnswer(id, guestId, body.row, body.col);
+    res.status(200).json({ game, isHost });
+    return;
+  }
+
+  if (body.action === "rematch") {
+    const allowed = await checkRateLimit(req, { action: "card_game_rematch", limit: 20, windowSeconds: 60 });
+    if (!allowed) throw Errors.rateLimited();
+    const guestId = ensureGuestId(req, res);
+    const { game, isHost } = await rematchCardGame(id, guestId);
     res.status(200).json({ game, isHost });
     return;
   }

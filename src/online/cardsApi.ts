@@ -61,3 +61,10 @@ export function submitCardAnswer(id: string, row: number, col: number): Promise<
     body: JSON.stringify({ action: "answer", row, col }),
   });
 }
+
+export function requestCardRematch(id: string): Promise<CardGameResponse> {
+  return request<CardGameResponse>(`/api/cards/games/${id}`, {
+    method: "POST",
+    body: JSON.stringify({ action: "rematch" }),
+  });
+}

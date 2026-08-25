@@ -11,14 +11,15 @@ import { isGameEffectivelyOver } from "../detectGameEnd.js";
  *
  * The service can hold more than one checkpoint at once, keyed by board size (see
  * service.py's `ModelState.models`). As of writing it has real, natively-trained
- * checkpoints for 19x19 and 9x9; any size without one (currently 13x13) falls back to
- * embed_in_canvas (see ai-service/src/adapters/game_adapter.py): the smaller board is
- * placed in a corner of a virtual 19x19 canvas before being handed to the 19x19 model,
- * since that model's final layer is sized for exactly 19x19 and can't accept any other
- * input shape at all. This is a best-effort adaptation, not an equivalent one — the
- * 19x19 model has never seen a real game at the fallback size, so expect visibly weaker
- * play there than on a size it was actually trained for. See `checkNeuralServiceHealth`'s
- * `nativeBoardSizes` for which sizes currently avoid the fallback.
+ * checkpoints for all three supported sizes (9x9, 13x13, 19x19). Any size that ever
+ * lacked one falls back to embed_in_canvas (see ai-service/src/adapters/game_adapter.py):
+ * the smaller board is placed in a corner of a virtual 19x19 canvas before being handed
+ * to the 19x19 model, since that model's final layer is sized for exactly 19x19 and can't
+ * accept any other input shape at all. This is a best-effort adaptation, not an
+ * equivalent one — the 19x19 model has never seen a real game at the fallback size, so
+ * expect visibly weaker play there than on a size it was actually trained for. See
+ * `checkNeuralServiceHealth`'s `nativeBoardSizes` for which sizes currently avoid the
+ * fallback (GameSetup.tsx checks this live rather than assuming it from this comment).
  */
 export const NEURAL_AI_SUPPORTED_BOARD_SIZES: readonly BoardSize[] = [9, 13, 19];
 

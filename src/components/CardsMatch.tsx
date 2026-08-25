@@ -8,12 +8,13 @@ interface CardsMatchProps {
   game: CardGame;
   isHost: boolean;
   onAnswer: (row: number, col: number) => Promise<boolean>;
+  onRematch: () => Promise<void>;
 }
 
 const CARDS_BY_ID = new Map(ALL_TESUJI_CARDS.map((c) => [c.id, c]));
 const HAND_SIZE = 5;
 
-export default function CardsMatch({ game, isHost, onAnswer }: CardsMatchProps) {
+export default function CardsMatch({ game, isHost, onAnswer, onRematch }: CardsMatchProps) {
   const myHand = isHost ? game.hostHand : game.guestHand;
   const myProgress = isHost ? game.hostProgress : game.guestProgress;
   const myMistakes = isHost ? game.hostMistakes : game.guestMistakes;
@@ -25,6 +26,7 @@ export default function CardsMatch({ game, isHost, onAnswer }: CardsMatchProps) 
   const [wrongPoints, setWrongPoints] = useState<{ row: number; col: number }[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [requestingRematch, setRequestingRematch] = useState(false);
 
   // A fresh card (new progress) starts with no wrong-guess marks of its own.
   useEffect(() => {
@@ -38,6 +40,12 @@ export default function CardsMatch({ game, isHost, onAnswer }: CardsMatchProps) 
   }, [game.status]);
 
   if (game.status === "finished") {
+    const handleRematch = async () => {
+      setRequestingRematch(true);
+      await onRematch();
+      setRequestingRematch(false);
+    };
+
     return (
       <div className="cards-match-result">
         <h2>{won ? "¡Has ganado!" : `Ha ganado ${opponentName ?? "el rival"}`}</h2>
@@ -47,6 +55,9 @@ export default function CardsMatch({ game, isHost, onAnswer }: CardsMatchProps) 
         <p>
           Rival: {opponentProgress}/{HAND_SIZE} resueltas, {opponentMistakes} fallo{opponentMistakes === 1 ? "" : "s"}.
         </p>
+        <button className="btn btn-primary" onClick={() => void handleRematch()} disabled={requestingRematch}>
+          {requestingRematch ? "Preparando revancha…" : "Revancha"}
+        </button>
       </div>
     );
   }

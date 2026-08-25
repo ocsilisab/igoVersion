@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { CardGame } from "../online/cardGameTypes.js";
-import { CardsApiError, createCardGame, fetchCardGame, joinCardGame, submitCardAnswer, submitCardHand } from "../online/cardsApi.js";
+import {
+  CardsApiError,
+  createCardGame,
+  fetchCardGame,
+  joinCardGame,
+  requestCardRematch,
+  submitCardAnswer,
+  submitCardHand,
+} from "../online/cardsApi.js";
 import { getSupabaseBrowserClient } from "../online/supabaseClient.js";
 
 const POLL_INTERVAL_MS = 3000;
@@ -18,6 +26,8 @@ export interface UseCardGameResult {
   submitHand: (deckIds: string[]) => Promise<void>;
   /** Answers the player's current hand card. */
   submitAnswer: (row: number, col: number) => Promise<boolean>;
+  /** Resets a finished match back to 'ready' for a new round with the same opponent. */
+  rematch: () => Promise<void>;
   clearError: () => void;
 }
 
@@ -141,5 +151,18 @@ export function useCardGame(): UseCardGameResult {
     [game, isHost]
   );
 
-  return { game, isHost, loading, error, joinByCode, submitHand, submitAnswer, clearError: () => setError(null) };
+  const rematch = useCallback(async () => {
+    const id = gameIdRef.current;
+    if (!id) return;
+    setError(null);
+    try {
+      const res = await requestCardRematch(id);
+      setGame(res.game);
+      setIsHost(res.isHost);
+    } catch (err) {
+      setError(err instanceof CardsApiError ? err.message : "No se ha podido pedir la revancha.");
+    }
+  }, []);
+
+  return { game, isHost, loading, error, joinByCode, submitHand, submitAnswer, rematch, clearError: () => setError(null) };
 }

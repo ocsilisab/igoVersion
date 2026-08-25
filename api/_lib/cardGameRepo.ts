@@ -252,3 +252,41 @@ export async function submitAnswer(gameId: string, guestId: string, row: number,
 
   return { game: rowToGame(updated as CardGameRow), isHost: side === "host" };
 }
+
+/**
+ * Resets a finished match back to 'ready' for a rematch: same two players, same code and
+ * connection, but fresh hands, progress and mistakes. Either side can trigger it -- the
+ * other side's CardsPlay screen picks up the reset via Realtime/polling like any other
+ * update, and its own "submit my hand once ready" effect fires again automatically.
+ */
+export async function rematchCardGame(gameId: string, guestId: string): Promise<{ game: CardGame; isHost: boolean }> {
+  const gameRow = await fetchRow(gameId);
+  const side = sideOf(gameRow, guestId);
+  if (!side) throw Errors.wrongColor();
+  if (gameRow.status !== "finished") throw Errors.badRequest("La partida todavía no ha terminado.");
+
+  const supabase = getSupabaseAdmin();
+  const { data: updated, error } = await supabase
+    .from("card_games")
+    .update({
+      host_hand: null,
+      guest_hand: null,
+      host_progress: 0,
+      guest_progress: 0,
+      host_mistakes: 0,
+      guest_mistakes: 0,
+      started_at: null,
+      winner: null,
+      status: "ready",
+      version: gameRow.version + 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", gameRow.id)
+    .eq("version", gameRow.version)
+    .select("*")
+    .maybeSingle();
+  if (error) throw Errors.serverError();
+  if (!updated) throw Errors.conflict();
+
+  return { game: rowToGame(updated as CardGameRow), isHost: side === "host" };
+}

@@ -40,3 +40,7 @@
 .cards-match-result p {
   margin: 4px 0;
 }
+
+.cards-match-result .btn {
+  margin-top: 18px;
+}

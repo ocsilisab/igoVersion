@@ -19,16 +19,22 @@ function myDeckIds(): string[] {
 }
 
 export default function CardsPlay({ onBack }: CardsPlayProps) {
-  const { game, isHost, loading, error, joinByCode, submitHand, submitAnswer, clearError } = useCardGame();
+  const { game, isHost, loading, error, joinByCode, submitHand, submitAnswer, rematch, clearError } = useCardGame();
   const [codeInput, setCodeInput] = useState("");
   const [copied, setCopied] = useState(false);
   const [joining, setJoining] = useState(false);
+  // Guards against re-submitting a hand while the first submission is still in flight
+  // (game.hostHand/guestHand is still null then too). Cleared on 'finished' so a rematch
+  // -- which resets the same game id back to 'ready' -- can submit a fresh hand again.
   const handSubmittedFor = useRef<string | null>(null);
 
-  // As soon as both sides are connected, hand over this player's deck so the server can
-  // deal their hand -- no extra button, matches the rest of the flow's "it just starts".
   useEffect(() => {
-    if (!game || game.status !== "ready") return;
+    if (!game) return;
+    if (game.status === "finished") {
+      handSubmittedFor.current = null;
+      return;
+    }
+    if (game.status !== "ready") return;
     const myHand = isHost ? game.hostHand : game.guestHand;
     if (myHand || handSubmittedFor.current === game.id) return;
     handSubmittedFor.current = game.id;
@@ -74,7 +80,7 @@ export default function CardsPlay({ onBack }: CardsPlayProps) {
       <h1 className="setup-title">Jugar</h1>
 
       {game && inMatch ? (
-        <CardsMatch game={game} isHost={isHost} onAnswer={submitAnswer} />
+        <CardsMatch game={game} isHost={isHost} onAnswer={submitAnswer} onRematch={rematch} />
       ) : game?.status === "ready" ? (
         <p className="online-waiting">Repartiendo cartas…</p>
       ) : (

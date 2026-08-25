@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useOnlineGame } from "../online/useOnlineGame";
 import { activeRoster, getActivePlayer, rosterNames } from "../online/turns";
+import { createOnlineGame, OnlineApiError } from "../online/api";
 import type { OnlinePlayer, PendingSeat } from "../online/types";
 import { calculateScore, removeDeadStones } from "../utils/scoring";
 import GoBoard from "./GoBoard";
@@ -15,6 +16,8 @@ interface OnlineGameScreenProps {
   /** Present when this tab was opened from a specific seat's personal invite link. */
   inviteToken?: string | null;
   onExit: () => void;
+  /** Creates a fresh game with the same settings and takes this browser into its waiting room. */
+  onRematch: (newGameId: string) => void;
 }
 
 function gameUrl(gameId: string): string {
@@ -51,7 +54,7 @@ function PendingSeatRow({
   );
 }
 
-export default function OnlineGameScreen({ gameId, inviteToken, onExit }: OnlineGameScreenProps) {
+export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematch }: OnlineGameScreenProps) {
   const {
     game,
     you,
@@ -76,6 +79,8 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit }: Online
   const [copiedSeatToken, setCopiedSeatToken] = useState<string | null>(null);
   const [joinName, setJoinName] = useState("");
   const [isJoining, setIsJoining] = useState(false);
+  const [rematching, setRematching] = useState(false);
+  const [rematchError, setRematchError] = useState<string | null>(null);
   const autoJoinAttempted = useRef(false);
 
   // A personal invite link: claim that seat automatically, then drop the token from the
@@ -153,6 +158,27 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit }: Online
   const handleLeave = async () => {
     setConfirmLeave(false);
     await leave();
+  };
+
+  /** Creates a fresh game with the same settings this one had, and jumps this browser into
+   * its waiting room -- the other player(s) need the new code, same as any new online game. */
+  const handleRematch = async () => {
+    setRematching(true);
+    setRematchError(null);
+    try {
+      const { game: newGame } = await createOnlineGame(
+        game.boardSize,
+        game.maxPlayers,
+        game.komi,
+        you?.team ?? "black",
+        game.extensions,
+        you?.displayName
+      );
+      onRematch(newGame.id);
+    } catch (err) {
+      setRematchError(err instanceof OnlineApiError ? err.message : "No se ha podido crear la revancha.");
+      setRematching(false);
+    }
   };
 
   const handleJoin = async () => {
@@ -380,7 +406,16 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit }: Online
       )}
 
       {game.status === "finished" && game.score && (
-        <GameOverModal score={game.score} onPlayAgain={onExit} onExit={onExit} />
+        <>
+          <GameOverModal
+            score={game.score}
+            onPlayAgain={() => void handleRematch()}
+            onExit={onExit}
+            playAgainLabel={rematching ? "Creando revancha…" : "Jugar de nuevo"}
+            playAgainDisabled={rematching}
+          />
+          {rematchError && <p className="error-banner">{rematchError}</p>}
+        </>
       )}
     </div>
   );
