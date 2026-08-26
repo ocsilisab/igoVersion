@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, type KeyboardEvent } from "react";
 import type { Board, BoardSize, Position, ScoreResult } from "../types/game";
 import { posKey } from "../utils/board";
 import { getHoshiPositions } from "../utils/hoshi";
@@ -92,10 +92,36 @@ export default function GoBoard({
                   : null
               : null;
 
+            const isInteractive = canPlace || canToggleDead;
+
             const handleClick = () => {
               if (canToggleDead) onToggleDead!({ row, col });
               else if (canPlace) onPlaceStone({ row, col });
             };
+
+            const handleKeyDown = (event: KeyboardEvent) => {
+              if (!isInteractive) return;
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                handleClick();
+              }
+            };
+
+            const pointDescription = `Fila ${row + 1}, columna ${col + 1}`;
+            const stoneDescription = isDead
+              ? `piedra ${stone === "black" ? "negra" : "blanca"} marcada como muerta`
+              : stone === "black"
+                ? "piedra negra"
+                : stone === "white"
+                  ? "piedra blanca"
+                  : territoryOwner
+                    ? `vacío, territorio ${territoryOwner === "black" ? "negro" : "blanco"}`
+                    : "vacío";
+            const ariaLabel = canToggleDead
+              ? `${pointDescription}, ${stoneDescription}. Pulsa para ${isDead ? "desmarcar" : "marcar"} el grupo como muerto.`
+              : canPlace
+                ? `${pointDescription}, vacío. Pulsa para colocar una piedra.`
+                : `${pointDescription}, ${stoneDescription}.`;
 
             return (
               <g key={`${row}-${col}`}>
@@ -103,8 +129,12 @@ export default function GoBoard({
                   cx={cx}
                   cy={cy}
                   r={step * 0.48}
-                  className={`cell-hit ${canPlace || canToggleDead ? "cell-hit-active" : ""}`}
+                  className={`cell-hit ${isInteractive ? "cell-hit-active" : ""}`}
                   onClick={handleClick}
+                  onKeyDown={handleKeyDown}
+                  role="gridcell"
+                  aria-label={ariaLabel}
+                  tabIndex={isInteractive ? 0 : -1}
                 />
                 {stone && (
                   <circle

@@ -55,6 +55,13 @@
   fill: rgba(0, 0, 0, 0.08);
 }
 
+.cell-hit:focus-visible {
+  outline: none;
+  fill: rgba(0, 0, 0, 0.08);
+  stroke: var(--accent);
+  stroke-width: 1.4;
+}
+
 .stone {
   pointer-events: none;
 }
