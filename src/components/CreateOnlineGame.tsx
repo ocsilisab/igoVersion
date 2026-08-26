@@ -189,6 +189,7 @@ export default function CreateOnlineGame({ onCancel, onEntered }: CreateOnlineGa
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder="Invitado_XXXX"
+            aria-label="Tu nombre"
             maxLength={24}
             disabled={busy}
           />
@@ -223,6 +224,7 @@ export default function CreateOnlineGame({ onCancel, onEntered }: CreateOnlineGa
                 value={codeInput}
                 onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
                 placeholder="AB7K92"
+                aria-label="Código de la partida"
                 maxLength={6}
                 disabled={busy}
                 autoCapitalize="characters"

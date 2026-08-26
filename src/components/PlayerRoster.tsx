@@ -36,6 +36,7 @@ export default function PlayerRoster({ title, players, onChange, min, max, disab
               type="text"
               value={name}
               onChange={(e) => renamePlayer(index, e.target.value)}
+              aria-label={`Nombre del jugador ${index + 1}`}
               maxLength={24}
               disabled={disabled}
             />

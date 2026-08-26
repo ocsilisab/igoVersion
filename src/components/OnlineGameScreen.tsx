@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useOnlineGame } from "../online/useOnlineGame";
+import { useClipboardCopy } from "../hooks/useClipboardCopy";
 import { activeRoster, getActivePlayer, rosterNames } from "../online/turns";
 import { createOnlineGame, joinOnlineGameById, OnlineApiError } from "../online/api";
 import { useOpenGames } from "../online/useOpenGames";
@@ -79,9 +80,9 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
   } = useOnlineGame(gameId);
 
   const [confirmLeave, setConfirmLeave] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
-  const [copiedSeatToken, setCopiedSeatToken] = useState<string | null>(null);
+  const { copiedKey: copiedCodeKey, copy: copyCode } = useClipboardCopy();
+  const { copiedKey: copiedLinkKey, copy: copyLink } = useClipboardCopy();
+  const { copiedKey: copiedSeatToken, copy: copySeatInvite } = useClipboardCopy();
   const [joinName, setJoinName] = useState("");
   const [isJoining, setIsJoining] = useState(false);
   const [rematching, setRematching] = useState(false);
@@ -135,33 +136,15 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
   }
 
   const handleCopyCode = async () => {
-    try {
-      await navigator.clipboard.writeText(game.code);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard permission denied/unavailable — the code is still visible on screen.
-    }
+    await copyCode(game.code, "code");
   };
 
   const handleCopyGameLink = async () => {
-    try {
-      await navigator.clipboard.writeText(gameUrl(game.id));
-      setCopiedLink(true);
-      window.setTimeout(() => setCopiedLink(false), 1500);
-    } catch {
-      // Clipboard permission denied/unavailable.
-    }
+    await copyLink(gameUrl(game.id), "link");
   };
 
   const handleCopySeatInvite = async (token: string) => {
-    try {
-      await navigator.clipboard.writeText(`${gameUrl(game.id)}&token=${token}`);
-      setCopiedSeatToken(token);
-      window.setTimeout(() => setCopiedSeatToken((t) => (t === token ? null : t)), 1500);
-    } catch {
-      // Clipboard permission denied/unavailable.
-    }
+    await copySeatInvite(`${gameUrl(game.id)}&token=${token}`, token);
   };
 
   const handleLeave = async () => {
@@ -230,10 +213,10 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
           <span className="online-code-value">{game.code}</span>
           <div className="online-code-actions">
             <button className="btn btn-secondary" onClick={() => void handleCopyCode()}>
-              {copied ? "¡Copiado!" : "Copiar código"}
+              {copiedCodeKey === "code" ? "¡Copiado!" : "Copiar código"}
             </button>
             <button className="btn btn-secondary" onClick={() => void handleCopyGameLink()}>
-              {copiedLink ? "¡Copiado!" : "Copiar enlace"}
+              {copiedLinkKey === "link" ? "¡Copiado!" : "Copiar enlace"}
             </button>
           </div>
         </div>
@@ -309,6 +292,7 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
                 value={joinName}
                 onChange={(e) => setJoinName(e.target.value)}
                 placeholder="Tu nombre (opcional)"
+                aria-label="Tu nombre"
                 maxLength={24}
                 disabled={isJoining}
               />

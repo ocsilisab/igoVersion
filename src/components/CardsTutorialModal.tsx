@@ -1,4 +1,5 @@
 import RuleDiagram from "./RuleDiagram";
+import { useModalDismiss } from "../hooks/useModalDismiss";
 import "./TutorialModal.css";
 
 interface CardsTutorialModalProps {
@@ -6,6 +7,8 @@ interface CardsTutorialModalProps {
 }
 
 export default function CardsTutorialModal({ onClose }: CardsTutorialModalProps) {
+  const dialogRef = useModalDismiss<HTMLDivElement>(onClose);
+
   return (
     <div className="modal-overlay" role="presentation" onClick={onClose}>
       <div
@@ -13,6 +16,8 @@ export default function CardsTutorialModal({ onClose }: CardsTutorialModalProps)
         role="dialog"
         aria-modal="true"
         aria-labelledby="cards-tutorial-title"
+        ref={dialogRef}
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="tutorial-header">

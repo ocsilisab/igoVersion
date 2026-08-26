@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, type KeyboardEvent } from "react";
 import "./RuleDiagram.css";
 
 interface DiagramStone {
@@ -46,10 +46,16 @@ export default function RuleDiagram({
   const coord = (i: number) => MARGIN + i * step;
   const stoneAt = (row: number, col: number) => stones.find((s) => s.row === row && s.col === col);
   const territoryAt = (row: number, col: number) => territory.find((t) => t.row === row && t.col === col);
+  const isInteractive = Boolean(onPointClick);
 
   return (
     <figure className="rule-diagram">
-      <svg viewBox={`0 0 ${VIEW_SIZE} ${VIEW_SIZE}`} className="rule-diagram-svg" role="img" aria-label={caption ?? "Diagrama de ejemplo"}>
+      <svg
+        viewBox={`0 0 ${VIEW_SIZE} ${VIEW_SIZE}`}
+        className="rule-diagram-svg"
+        role={isInteractive ? "grid" : "img"}
+        aria-label={caption ?? "Diagrama de ejemplo"}
+      >
         <rect x={0} y={0} width={VIEW_SIZE} height={VIEW_SIZE} className="rule-diagram-bg" rx={4} />
 
         {Array.from({ length: size }).map((_, i) => (
@@ -68,7 +74,14 @@ export default function RuleDiagram({
             const isLiberty = liberties.some((l) => l.row === row && l.col === col);
             const owner = territoryAt(row, col)?.color;
             const isWrongGuess = wrongPoints.some((p) => p.row === row && p.col === col);
-            const clickable = isEmpty && Boolean(onPointClick);
+            const clickable = isEmpty && isInteractive;
+
+            const handleKeyDown = (event: KeyboardEvent) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onPointClick!(row, col);
+              }
+            };
 
             return (
               <g key={`${row}-${col}`}>
@@ -79,6 +92,10 @@ export default function RuleDiagram({
                     r={step * 0.48}
                     className="rule-diagram-hit"
                     onClick={() => onPointClick!(row, col)}
+                    onKeyDown={handleKeyDown}
+                    role="gridcell"
+                    aria-label={`Fila ${row + 1}, columna ${col + 1}, vacío. Pulsa para responder aquí.`}
+                    tabIndex={0}
                   />
                 )}
                 {stone && (

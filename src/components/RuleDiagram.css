@@ -54,6 +54,13 @@
   fill: rgba(0, 0, 0, 0.08);
 }
 
+.rule-diagram-hit:focus-visible {
+  outline: none;
+  fill: rgba(0, 0, 0, 0.08);
+  stroke: var(--accent);
+  stroke-width: 1.4;
+}
+
 .rule-diagram-liberty {
   fill: none;
   stroke: var(--accent);
