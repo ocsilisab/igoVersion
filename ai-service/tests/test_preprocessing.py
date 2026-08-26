@@ -10,8 +10,10 @@ from src.preprocessing import (
     _sample_indices,
     _split_for_game,
     decode_sample_to_tensor,
+    decode_sample_with_value,
     iter_game_samples,
     iter_selected_games,
+    run_preprocessing,
 )
 from src.sgf_utils import ParsedGame
 
@@ -196,6 +198,115 @@ def test_decode_sample_to_tensor_handles_a_pass_in_recent_moves_on_a_smaller_boa
     assert label == board_size * board_size
     assert tensor[3].sum() == 0.0  # the pass contributes no marked position
     assert tensor[4, 3, 3] == 1.0  # the real move one ply back still does
+
+
+def test_iter_game_samples_value_target_flips_by_perspective():
+    # Same game, black wins -- the position where black is to move must get +1, and the
+    # very next position (white to move, same eventual outcome) must get -1. This is the
+    # perspective-of-mover convention the spec calls out explicitly (Paso 5).
+    game = ParsedGame(
+        board_size=BOARD_SIZE,
+        moves=[("black", (0, 0)), ("white", (1, 1)), ("black", (2, 2))],
+        winner="black",
+    )
+    samples = list(iter_game_samples(game, max_positions_per_game=60))
+    assert [s.current_player for s in samples] == ["black", "white", "black"]
+    assert samples[0].value_target == 1.0  # black to move, black wins
+    assert samples[1].value_target == -1.0  # white to move, black (the other side) wins
+    assert samples[2].value_target == 1.0  # black to move again, black wins
+
+
+def test_iter_game_samples_value_target_flips_the_other_way_when_white_wins():
+    game = ParsedGame(
+        board_size=BOARD_SIZE,
+        moves=[("black", (0, 0)), ("white", (1, 1))],
+        winner="white",
+    )
+    samples = list(iter_game_samples(game, max_positions_per_game=60))
+    assert samples[0].value_target == -1.0  # black to move, white wins
+    assert samples[1].value_target == 1.0  # white to move, white wins
+
+
+def test_iter_game_samples_value_target_none_without_a_determinate_winner():
+    game = ParsedGame(board_size=BOARD_SIZE, moves=[("black", (0, 0)), ("white", (1, 1))])
+    samples = list(iter_game_samples(game, max_positions_per_game=60))
+    assert all(s.value_target is None for s in samples)
+
+
+def test_decode_sample_with_value_roundtrip(tmp_path: Path):
+    board = empty_board(BOARD_SIZE)
+    sample = RawSample(
+        board=board,
+        current_player="black",
+        recent_moves=[None, None, None],
+        label=move_to_label((7, 7), BOARD_SIZE),
+        value_target=1.0,
+    )
+    writer = ShardWriter(tmp_path, "train", shard_size=5)
+    writer.add(sample)
+    writer.close()
+
+    shard = torch.load(tmp_path / "train" / "shard_00000.pt")
+    tensor, label, value = decode_sample_with_value(shard, 0)
+    assert label == sample.label
+    assert value == 1.0
+    assert tensor.shape == (6, BOARD_SIZE, BOARD_SIZE)
+
+
+def test_decode_sample_with_value_is_nan_when_target_is_none(tmp_path: Path):
+    board = empty_board(BOARD_SIZE)
+    sample = RawSample(
+        board=board, current_player="black", recent_moves=[None, None, None], label=0, value_target=None
+    )
+    writer = ShardWriter(tmp_path, "train", shard_size=5)
+    writer.add(sample)
+    writer.close()
+
+    shard = torch.load(tmp_path / "train" / "shard_00000.pt")
+    _, _, value = decode_sample_with_value(shard, 0)
+    assert value != value  # NaN != NaN
+
+
+def test_decode_sample_with_value_is_nan_for_a_shard_written_before_value_existed(tmp_path: Path):
+    # Simulates one of the ~15GB of already-on-disk shards from before the Value Head:
+    # no "value" key in the dict at all -- must not raise.
+    board = empty_board(BOARD_SIZE)
+    sample = RawSample(board=board, current_player="black", recent_moves=[None, None, None], label=0)
+    writer = ShardWriter(tmp_path, "train", shard_size=5)
+    writer.add(sample)
+    writer.close()
+
+    shard = torch.load(tmp_path / "train" / "shard_00000.pt")
+    del shard["value"]
+    _, _, value = decode_sample_with_value(shard, 0)
+    assert value != value  # NaN != NaN
+
+
+def test_run_preprocessing_require_winner_drops_indeterminate_games(tmp_path: Path):
+    raw_games = [
+        b"(;GM[1]FF[4]SZ[19]RE[B+3.5];B[aa];W[bb])",  # determinate
+        b"(;GM[1]FF[4]SZ[19];B[cc];W[dd])",  # no RE at all -> excluded
+        b"(;GM[1]FF[4]SZ[19]RE[?];B[ee];W[ff])",  # unreliable -> excluded
+    ]
+    stats = run_preprocessing(
+        raw_game_bytes=iter(raw_games),
+        out_dir=tmp_path,
+        max_games=10,
+        max_positions_per_game=60,
+        require_winner=True,
+    )
+    assert stats["games_processed"] == 1
+
+
+def test_run_preprocessing_without_require_winner_keeps_all_games(tmp_path: Path):
+    raw_games = [
+        b"(;GM[1]FF[4]SZ[19]RE[B+3.5];B[aa];W[bb])",
+        b"(;GM[1]FF[4]SZ[19];B[cc];W[dd])",
+    ]
+    stats = run_preprocessing(
+        raw_game_bytes=iter(raw_games), out_dir=tmp_path, max_games=10, max_positions_per_game=60
+    )
+    assert stats["games_processed"] == 2
 
 
 def test_shard_writer_flushes_multiple_shards(tmp_path: Path):

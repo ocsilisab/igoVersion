@@ -137,3 +137,39 @@ def test_parse_sgf_game_does_not_duplicate_an_already_recorded_pass():
     assert game is not None
     assert game.moves[-1] == ("black", None)
     assert game.moves.count(("black", None)) + game.moves.count(("white", None)) == 1
+
+
+def test_parse_sgf_game_extracts_winner_from_scored_result():
+    raw = b"(;GM[1]FF[4]SZ[19]RE[B+3.5];B[aa];W[bb])"
+    game = parse_sgf_game(raw)
+    assert game is not None
+    assert game.winner == "black"
+
+
+def test_parse_sgf_game_extracts_winner_from_resignation():
+    raw = b"(;GM[1]FF[4]SZ[19]RE[W+Resign];B[aa];W[bb])"
+    game = parse_sgf_game(raw)
+    assert game is not None
+    assert game.winner == "white"
+
+
+def test_parse_sgf_game_extracts_winner_from_timeout():
+    raw = b"(;GM[1]FF[4]SZ[19]RE[B+Time];B[aa];W[bb])"
+    game = parse_sgf_game(raw)
+    assert game is not None
+    assert game.winner == "black"
+
+
+def test_parse_sgf_game_winner_is_none_without_result():
+    raw = b"(;GM[1]FF[4]SZ[19];B[aa];W[bb])"
+    game = parse_sgf_game(raw)
+    assert game is not None
+    assert game.winner is None
+
+
+def test_parse_sgf_game_winner_is_none_for_unreliable_results():
+    for re_value in (b"?", b"Void", b"0", b""):
+        raw = b"(;GM[1]FF[4]SZ[19]RE[" + re_value + b"];B[aa];W[bb])"
+        game = parse_sgf_game(raw)
+        assert game is not None
+        assert game.winner is None, f"RE[{re_value!r}] should not yield a determinate winner"

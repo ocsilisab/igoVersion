@@ -23,6 +23,29 @@ def test_health_endpoint_reports_model_status(client):
     body = response.json()
     assert "status" in body
     assert "model_loaded" in body
+    assert "value_models_loaded" in body
+    # No checkpoints/policy_value/*.pt exists yet in this repo -- empty until trained.
+    assert body["value_models_loaded"] == []
+
+
+def test_ai_move_has_no_value_field_yet_since_no_value_checkpoint_exists(client):
+    health = client.get("/health").json()
+    if not health["model_loaded"]:
+        pytest.skip("No hay checkpoint entrenado disponible en este entorno.")
+
+    response = client.post(
+        "/ai/move",
+        json={
+            "board": _empty_board_json(),
+            "board_size": BOARD_SIZE,
+            "current_player": "black",
+            "recent_moves": [],
+            "history": [],
+            "top_n": 3,
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["value"] is None
 
 
 def test_ai_move_returns_a_legal_move_on_empty_board(client):

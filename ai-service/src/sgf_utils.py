@@ -37,6 +37,11 @@ class ParsedGame:
     # a single OGS dump mixes every skill level together.
     black_rank: Optional[str] = None
     white_rank: Optional[str] = None
+    # Determinate winner of the game, or None when the result can't be trusted (see
+    # parse_winner) -- used as the Value Network's training target, never for the
+    # synthetic-pass logic below (_ends_by_real_score checks the RE property directly,
+    # since a resignation/timeout has a real winner but no scored margin to add passes for).
+    winner: Optional[Player] = None
 
 
 _RANK_PATTERN = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*([kdp])\s*$", re.IGNORECASE)
@@ -101,6 +106,26 @@ def _ends_by_real_score(root) -> bool:
     return margin[:1].isdigit()  # "3.5", "0.0", ... — not "R"/"Resign", "T"/"Time", "F"...
 
 
+def parse_winner(root) -> Optional[Player]:
+    """Determinate winner from the RE property, or None when it can't be trusted as a
+    training signal: no RE at all, an unparseable/void/forfeit-without-a-color value, or
+    a draw (jigo) -- none of those give the Value Network a real +1/-1 target. A
+    resignation ("B+Resign"/"B+R") or timeout ("W+Time"/"W+T") still has a real winner
+    and is accepted here, unlike _ends_by_real_score above which only accepts a scored
+    margin (a different, narrower question: "did this game reach two passes?")."""
+    if not root.has_property("RE"):
+        return None
+    result = root.get("RE")
+    if not result:
+        return None
+    color = result.strip()[:1].upper()
+    if color == "B":
+        return "black"
+    if color == "W":
+        return "white"
+    return None  # "?", "Void", "0" (draw), or anything else without a clear winner
+
+
 def parse_sgf_game(raw: bytes, target_board_size: int = TARGET_BOARD_SIZE) -> Optional[ParsedGame]:
     """Returns None for anything this pipeline deliberately skips: any board size other
     than `target_board_size` (a different size needs its own preprocessing run and,
@@ -147,4 +172,10 @@ def parse_sgf_game(raw: bytes, target_board_size: int = TARGET_BOARD_SIZE) -> Op
     black_rank = root.get("BR") if root.has_property("BR") else None
     white_rank = root.get("WR") if root.has_property("WR") else None
 
-    return ParsedGame(board_size=board_size, moves=moves, black_rank=black_rank, white_rank=white_rank)
+    return ParsedGame(
+        board_size=board_size,
+        moves=moves,
+        black_rank=black_rank,
+        white_rank=white_rank,
+        winner=parse_winner(root),
+    )

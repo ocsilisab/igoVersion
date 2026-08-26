@@ -40,6 +40,11 @@ def main() -> None:
         "--source-dir", type=Path, required=True, help="Root directory of already-extracted OGS SGF files"
     )
     parser.add_argument("--out-dir", type=Path, default=None)
+    parser.add_argument(
+        "--require-winner",
+        action="store_true",
+        help="Drop games with no determinate result (see sgf_utils.parse_winner) -- needed to train the Value Head",
+    )
     args = parser.parse_args()
 
     with open(args.config, "r", encoding="utf-8") as f:
@@ -65,6 +70,7 @@ def main() -> None:
         game_filter=make_rank_filter(min_rank) if min_rank is not None else None,
         max_positions_per_game=dataset_cfg["max_positions_per_game"],
         scanned_log_every=50_000,
+        require_winner=args.require_winner,
     )
     print(stats)
 

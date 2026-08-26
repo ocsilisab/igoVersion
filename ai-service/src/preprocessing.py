@@ -38,6 +38,11 @@ class RawSample:
     current_player: Player
     recent_moves: List[Optional[Position]]  # most-recent-first, len == NUM_RECENT_MOVES
     label: int
+    # Value Network training target, from current_player's own perspective: +1.0 if
+    # current_player went on to win, -1.0 if they lost. None when the game's own result
+    # couldn't be trusted (see sgf_utils.parse_winner) -- this sample can still train the
+    # Policy Head, it just carries no Value signal. See iter_game_samples.
+    value_target: Optional[float] = None
 
 
 def _split_for_game(game_index: int) -> str:
@@ -76,6 +81,14 @@ def iter_game_samples(game: ParsedGame, max_positions_per_game: int) -> Iterator
     across every rank checked, dan and kyu alike) -- so this is currently a no-op, but a
     correct and essentially free one, kept in case a future data source does the honest
     thing and includes them.
+
+    Each yielded sample also carries value_target (see RawSample): +1.0/-1.0 from
+    `player`'s own perspective at that ply, flipped between a black-to-move and a
+    white-to-move position in the same game even though the game's winner is fixed --
+    None when game.winner itself is None (result not determinable; see
+    sgf_utils.parse_winner). This never changes *which* samples are yielded, only what
+    value_target they carry -- excluding whole games with no determinate result is the
+    caller's job (run_preprocessing's require_winner), not this function's.
     """
     board = empty_board(game.board_size)
     recent: List[Optional[Position]] = []  # most-recent-first
@@ -83,12 +96,14 @@ def iter_game_samples(game: ParsedGame, max_positions_per_game: int) -> Iterator
     pass_label = game.board_size * game.board_size
 
     for player, move in game.moves:
+        value_target = None if game.winner is None else (1.0 if player == game.winner else -1.0)
         candidates.append(
             RawSample(
                 board=board,
                 current_player=player,
                 recent_moves=(recent + [None, None, None])[:NUM_RECENT_MOVES],
                 label=move_to_label(move, game.board_size),
+                value_target=value_target,
             )
         )
         board = apply_move(board, game.board_size, player, move)
@@ -166,6 +181,12 @@ def _sample_to_record(sample: RawSample, board_size: int) -> dict:
         "player": torch.tensor(1 if sample.current_player == "black" else 0, dtype=torch.uint8),
         "recent": recent,
         "label": torch.tensor(sample.label, dtype=torch.int16),
+        # NaN sentinel when the game's result wasn't determinable (see RawSample.value_target)
+        # -- always present so every record in a buffer stacks uniformly regardless of
+        # whether any individual sample actually has a usable Value target.
+        "value": torch.tensor(
+            sample.value_target if sample.value_target is not None else float("nan"), dtype=torch.float32
+        ),
     }
 
 
@@ -203,6 +224,7 @@ class ShardWriter:
             "player": torch.stack([r["player"] for r in self._buffer]),
             "recent": torch.stack([r["recent"] for r in self._buffer]),
             "label": torch.stack([r["label"] for r in self._buffer]),
+            "value": torch.stack([r["value"] for r in self._buffer]),
             "board_size": self.board_size,
         }
         path = self.dir / f"shard_{self._shard_index:05d}.pt"
@@ -234,6 +256,17 @@ def decode_sample_to_tensor(shard: dict, i: int) -> Tuple[torch.Tensor, int]:
     return tensor, int(shard["label"][i])
 
 
+def decode_sample_with_value(shard: dict, i: int) -> Tuple[torch.Tensor, int, float]:
+    """Same as decode_sample_to_tensor, plus the Value Network target for sample `i`.
+    Shards written before the Value Head existed have no "value" key at all -- those
+    read back as float('nan') rather than raising, same sentinel a determinable-but-
+    excluded game gets (see RawSample.value_target); callers filter NaNs out at load
+    time (see train_policy_value.py::ValueShardDataset) rather than crashing on old data."""
+    tensor, label = decode_sample_to_tensor(shard, i)
+    value = float(shard["value"][i]) if "value" in shard else float("nan")
+    return tensor, label, value
+
+
 def run_preprocessing(
     raw_game_bytes: Iterator[bytes],
     out_dir: Path,
@@ -244,14 +277,28 @@ def run_preprocessing(
     shard_size: int = 2000,
     log_every: int = 2000,
     scanned_log_every: Optional[int] = None,
+    require_winner: bool = False,
 ) -> dict:
-    """Runs the full pipeline and returns per-split sample counts."""
+    """Runs the full pipeline and returns per-split sample counts.
+
+    require_winner=True additionally drops any game whose result couldn't be trusted
+    (see sgf_utils.parse_winner: no RE property, "?", "Void", a draw, ...) -- composed
+    with `game_filter` rather than replacing it, so a caller's own filter (e.g. the OGS
+    rank filter) still applies too. Off by default so re-running the existing Policy-only
+    preprocessing entry points (preprocessing.py, preprocess_ogs.py) without this flag
+    behaves exactly as it always has; pass it explicitly when regenerating shards meant
+    to train the Value Head (see train_policy_value.py)."""
+    effective_filter = game_filter
+    if require_winner:
+        def effective_filter(g: ParsedGame) -> bool:
+            return g.winner is not None and (game_filter is None or game_filter(g))
+
     writers = {split: ShardWriter(out_dir, split, shard_size, board_size=board_size) for split in SPLIT_NAMES}
     games_processed = 0
     start = time.time()
     try:
         for game_index, game in iter_selected_games(
-            raw_game_bytes, max_games, board_size, game_filter, scanned_log_every
+            raw_game_bytes, max_games, board_size, effective_filter, scanned_log_every
         ):
             split = _split_for_game(game_index)
             for sample in iter_game_samples(game, max_positions_per_game):
@@ -279,6 +326,11 @@ def main() -> None:
     parser.add_argument("--config", type=Path, default=Path(__file__).resolve().parent.parent / "config.yaml")
     parser.add_argument("--data-dir", type=Path, default=None)
     parser.add_argument("--out-dir", type=Path, default=None)
+    parser.add_argument(
+        "--require-winner",
+        action="store_true",
+        help="Drop games with no determinate result (see sgf_utils.parse_winner) -- needed to train the Value Head",
+    )
     args = parser.parse_args()
 
     with open(args.config, "r", encoding="utf-8") as f:
@@ -292,7 +344,8 @@ def main() -> None:
 
     print(
         f"Preprocesando ranks={dataset_cfg['ranks']} max_games={dataset_cfg['max_games']} "
-        f"board_size={board_size} max_positions_per_game={dataset_cfg['max_positions_per_game']}",
+        f"board_size={board_size} max_positions_per_game={dataset_cfg['max_positions_per_game']} "
+        f"require_winner={args.require_winner}",
         flush=True,
     )
     stats = run_preprocessing(
@@ -301,6 +354,7 @@ def main() -> None:
         max_games=dataset_cfg["max_games"],
         board_size=board_size,
         max_positions_per_game=dataset_cfg["max_positions_per_game"],
+        require_winner=args.require_winner,
     )
     print(stats)
 

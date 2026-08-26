@@ -33,6 +33,15 @@ model:
   residual_blocks: 6
   num_labels: 362 # 19*19 + 1 pase
 
+# Value Head (see model.py::PolicyValueNetwork, train_policy_value.py) -- shares the
+# Policy Network's backbone above rather than a separate model. Untouched by train.py;
+# only train_policy_value.py reads this section.
+value_head:
+  enabled: true
+  value_channels: 4
+  hidden_size: 128
+  output_activation: tanh # -1 = favorable a blancas, 0 = equilibrada, +1 = favorable a negras/quien mueve (ver Paso 5)
+
 training:
   # batch_size 32 (spec's suggested default) left the RTX 5060 at ~28% utilization and
   # projected a ~15.4h run against the <12h target; measured on the real 5.35M-sample
@@ -46,3 +55,14 @@ training:
   early_stopping:
     enabled: true
     patience: 5
+  # Below: only read by train_policy_value.py (Fase A/B), not by the original train.py.
+  policy_loss_weight: 1.0
+  value_loss_weight: 1.0
+  freeze_backbone_epochs: 3 # Fase A: backbone + Policy Head frozen, solo entrena el Value Head
+
+# Fase B de train_policy_value.py: backbone y Policy Head descongelados, fine-tuning
+# conjunto a una tasa de aprendizaje menor que la de entrenamiento normal.
+fine_tuning:
+  enabled: true
+  learning_rate: 0.0001
+  epochs: 10
