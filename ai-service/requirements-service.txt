@@ -3,10 +3,10 @@
 # (see requirements.txt). Kept separate so the Docker image built from this file stays small
 # and doesn't need a GPU: CPU-only torch is enough for inference on a ~1.5M-parameter model.
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch>=2.7
-fastapi
-uvicorn[standard]
+torch==2.13.0
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
 # service.py reads config.yaml's `mcts:` section directly (import yaml). Listed explicitly
 # even though uvicorn[standard]'s extras happen to pull it in today too -- relying on that
 # transitively would silently break the whole service on the day that stops being true.
-pyyaml
+pyyaml==6.0.3
