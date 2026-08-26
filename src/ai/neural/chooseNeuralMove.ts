@@ -145,7 +145,11 @@ export async function chooseNeuralMove(gameState: GameState, aiColor: Player): P
     ? moves.find((m) => m.position.row === networkMove.row && m.position.col === networkMove.col)
     : null;
   const networkMargin = networkCandidate
-    ? lifeAwareMargin(networkCandidate.resultingBoard, gameState.boardSize, aiColor, networkCandidate.capturedCount, gameState.komi) - before
+    // 0, not networkCandidate.capturedCount -- see detectGameEnd.ts::isGameEffectivelyOver's
+    // docstring: passing the real capture count here would double-count a group
+    // findHopelessEnemyGroups already wrote off, making "finish the kill on a group
+    // that's already dead" look like a real gain and never trigger the override below.
+    ? lifeAwareMargin(networkCandidate.resultingBoard, gameState.boardSize, aiColor, 0, gameState.komi) - before
     : 0; // the network chose to pass (or, defensively, an unrecognized point) -- same as "gains nothing"
 
   if (networkMargin < MIN_BENEFICIAL_MARGIN) {

@@ -213,6 +213,19 @@ export function lifeAwareMargin(board: Board, boardSize: BoardSize, aiColor: Pla
  * unambiguous shapes (see EYE_REGION_SIZE_CAP). A genuinely ambiguous fight (seki,
  * bent-four, a shared eye, or any group whose room is still bigger than the cap) is left
  * completely alone rather than guessed at.
+ *
+ * `candidate.capturedCount` is deliberately never passed to the "after" lifeAwareMargin
+ * call below (always 0 instead) — passing it double-counts a group findHopelessEnemyGroups
+ * already wrote off. That heuristic strips a hopeless group from the *current* board and
+ * credits its points as territory before any candidate is even considered, so a candidate
+ * that actually finishes capturing it already shows those same points as territory in its
+ * own resulting board too (the stones are genuinely gone) — adding the move's real
+ * capturedCount on top would count that same group's death twice. A real capture the
+ * heuristic did *not* already presume (a healthy-looking group unexpectedly falling)
+ * still shows up correctly: its stones vanish from the resulting board and stop counting
+ * for the opponent regardless of this parameter, no separate credit required. Omitting it
+ * is exactly what previously let the AI think finishing off a group it had already
+ * written off was worth playing, when nothing about the score actually changed.
  */
 export function isGameEffectivelyOver(
   board: Board,
@@ -226,7 +239,7 @@ export function isGameEffectivelyOver(
   const before = lifeAwareMargin(board, boardSize, aiColor, 0, komi);
 
   return !candidates.some((candidate) => {
-    const after = lifeAwareMargin(candidate.resultingBoard, boardSize, aiColor, candidate.capturedCount, komi);
+    const after = lifeAwareMargin(candidate.resultingBoard, boardSize, aiColor, 0, komi);
     return after - before >= MIN_BENEFICIAL_MARGIN;
   });
 }
@@ -243,6 +256,12 @@ export function isGameEffectivelyOver(
  * rest of the game, which would ignore sente/gote, ko threats, and unresolved fights.
  * See chooseNeuralMove.ts for the one caller: a safety net for when "Experta"'s own pick
  * gains nothing (see isGameEffectivelyOver's docstring for why that happens).
+ *
+ * Like isGameEffectivelyOver, `candidate.capturedCount` is deliberately never passed to
+ * the "after" lifeAwareMargin call (see that docstring for why) — otherwise finishing off
+ * a group findHopelessEnemyGroups had already written off would misread as the single
+ * biggest-margin move on the board, and this function would keep steering "Experta" at
+ * it move after move instead of an actual dame or a move that changes something real.
  */
 export function bestBeneficialMove(
   board: Board,
@@ -256,7 +275,7 @@ export function bestBeneficialMove(
   let best: ScoredEndgameCandidate | null = null;
   let bestMargin = -Infinity;
   for (const candidate of candidates) {
-    const after = lifeAwareMargin(candidate.resultingBoard, boardSize, aiColor, candidate.capturedCount, komi);
+    const after = lifeAwareMargin(candidate.resultingBoard, boardSize, aiColor, 0, komi);
     const margin = after - before;
     if (margin > bestMargin) {
       bestMargin = margin;
