@@ -38,7 +38,12 @@ export default withHandler(["GET", "POST"], async (req: VercelRequest, res: Verc
   if (body.action === "hand") {
     const allowed = await checkRateLimit(req, { action: "card_game_hand", limit: 20, windowSeconds: 60 });
     if (!allowed) throw Errors.rateLimited();
-    if (!Array.isArray(body.deckIds) || !body.deckIds.every((v) => typeof v === "string")) {
+    if (
+      !Array.isArray(body.deckIds) ||
+      body.deckIds.length === 0 ||
+      body.deckIds.length > 200 ||
+      !body.deckIds.every((v) => typeof v === "string")
+    ) {
       throw Errors.badRequest("Baraja no válida.");
     }
     const guestId = ensureGuestId(req, res);

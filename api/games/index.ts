@@ -1,14 +1,12 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { BoardSize, Player } from "../../src/types/game.js";
-import { KOMI_OPTIONS, MIN_TOTAL_PLAYERS, MAX_TOTAL_PLAYERS } from "../../src/types/game.js";
+import { BOARD_SIZES, KOMI_OPTIONS, MIN_TOTAL_PLAYERS, MAX_TOTAL_PLAYERS } from "../../src/types/game.js";
 import { buildGameResponse } from "../../src/online/turns.js";
 import { withHandler, readBody } from "../_lib/http.js";
 import { checkRateLimit } from "../_lib/rateLimit.js";
 import { Errors } from "../_lib/errors.js";
 import { ensureGuestId, sanitizeDisplayName, defaultGuestName } from "../_lib/session.js";
 import { createGame, listOpenGames } from "../_lib/gameRepo.js";
-
-const VALID_SIZES: BoardSize[] = [9, 13, 19];
 
 interface CreateGameBody {
   boardSize?: number;
@@ -33,7 +31,7 @@ export default withHandler(["GET", "POST"], async (req: VercelRequest, res: Verc
   const guestId = ensureGuestId(req, res);
   const body = readBody<CreateGameBody>(req);
 
-  if (!VALID_SIZES.includes(body.boardSize as BoardSize)) {
+  if (!BOARD_SIZES.includes(body.boardSize as BoardSize)) {
     throw Errors.badRequest("Tamaño de tablero no válido.");
   }
   if (
