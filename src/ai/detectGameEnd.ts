@@ -9,6 +9,12 @@ export interface EndgameCandidate {
   resultingBoard: Board;
 }
 
+/** An EndgameCandidate that also knows which point it is — bestBeneficialMove needs this
+ * to hand back an actual move, not just a yes/no verdict the way isGameEffectivelyOver does. */
+export interface ScoredEndgameCandidate extends EndgameCandidate {
+  position: Position;
+}
+
 /**
  * Minimum net score swing (in points) a move must gain over passing before it counts as
  * still worth playing. Area scoring makes a stone and a point of territory worth exactly
@@ -16,7 +22,7 @@ export interface EndgameCandidate {
  * this bar — only a capture, a group-saving extension, or claiming a neutral/contested
  * point (all of which turn an uncounted point into a counted one) clears it.
  */
-const MIN_BENEFICIAL_MARGIN = 1;
+export const MIN_BENEFICIAL_MARGIN = 1;
 
 /**
  * Only an empty region no bigger than this counts as a real "eye" when deciding whether an
@@ -174,7 +180,7 @@ function findHopelessEnemyGroups(board: Board, boardSize: BoardSize, aiColor: Pl
  * a group's status (finishing a kill, or the group unexpectedly gaining real room) still
  * shows up as a real margin swing.
  */
-function lifeAwareMargin(board: Board, boardSize: BoardSize, aiColor: Player, capturesForAi: number, komi: number): number {
+export function lifeAwareMargin(board: Board, boardSize: BoardSize, aiColor: Player, capturesForAi: number, komi: number): number {
   const hopelessEnemyStones = findHopelessEnemyGroups(board, boardSize, aiColor);
   const { board: cleaned, deadBlack, deadWhite } = removeDeadStones(board, hopelessEnemyStones);
   const blackCaptures = (aiColor === "black" ? capturesForAi : 0) + deadWhite;
@@ -194,10 +200,13 @@ function lifeAwareMargin(board: Board, boardSize: BoardSize, aiColor: Player, ca
  * findHopelessEnemyGroups) does not — that credit was already banked before the move.
  * Only moves that change nothing but the shape of your own already-solid territory, or
  * mechanically capture a group already known to be dead, fail to clear it — which is
- * exactly when a human stops playing. Used by both heuristic difficulties ("Fácil" in
- * chooseMove.ts, "Difícil" in mcts/search.ts) so they share one definition of "nothing
- * left to gain"; "Experta" is untouched, since the neural net learned its own sense of
- * when a position is settled from training data.
+ * exactly when a human stops playing. Used by all three difficulties ("Fácil" in
+ * chooseMove.ts, "Difícil" in mcts/search.ts, and "Experta" in chooseNeuralMove.ts) so
+ * they share one definition of "nothing left to gain" for when to pass. "Experta" also
+ * uses this same margin (see bestBeneficialMove below) to catch the neural net picking a
+ * move that gains nothing when a real one is available — professional game records
+ * essentially never show the actual dame-filling sequence (see ai-service/config.yaml's
+ * dataset notes), so the network never had much to learn that specific skill from.
  *
  * Caveat: findHopelessEnemyGroups is a heuristic, not a full life-and-death reading, and
  * only ever acts very late (see MIN_OCCUPANCY_FOR_DEAD_GROUP_CHECK) and only on small,
@@ -220,4 +229,40 @@ export function isGameEffectivelyOver(
     const after = lifeAwareMargin(candidate.resultingBoard, boardSize, aiColor, candidate.capturedCount, komi);
     return after - before >= MIN_BENEFICIAL_MARGIN;
   });
+}
+
+/**
+ * The single candidate with the biggest beneficial margin over passing — null if none of
+ * them clear MIN_BENEFICIAL_MARGIN (see isGameEffectivelyOver; call that first to decide
+ * whether to pass instead of trusting this to return null).
+ *
+ * Greedily maximizing this margin is the *correct* choice specifically for this narrow
+ * decision: under area scoring every dame/neutral point is worth exactly the same one
+ * point regardless of which one you take, so there is no strategic difference between
+ * them to weigh — unlike using this margin as a general move-selection strategy for the
+ * rest of the game, which would ignore sente/gote, ko threats, and unresolved fights.
+ * See chooseNeuralMove.ts for the one caller: a safety net for when "Experta"'s own pick
+ * gains nothing (see isGameEffectivelyOver's docstring for why that happens).
+ */
+export function bestBeneficialMove(
+  board: Board,
+  boardSize: BoardSize,
+  komi: number,
+  aiColor: Player,
+  candidates: ScoredEndgameCandidate[]
+): ScoredEndgameCandidate | null {
+  const before = lifeAwareMargin(board, boardSize, aiColor, 0, komi);
+
+  let best: ScoredEndgameCandidate | null = null;
+  let bestMargin = -Infinity;
+  for (const candidate of candidates) {
+    const after = lifeAwareMargin(candidate.resultingBoard, boardSize, aiColor, candidate.capturedCount, komi);
+    const margin = after - before;
+    if (margin > bestMargin) {
+      bestMargin = margin;
+      best = candidate;
+    }
+  }
+
+  return bestMargin >= MIN_BENEFICIAL_MARGIN ? best : null;
 }

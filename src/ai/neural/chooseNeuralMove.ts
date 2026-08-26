@@ -1,6 +1,6 @@
 import type { BoardSize, GameState, Player, Position } from "../../types/game.js";
 import { getValidMoves } from "../getValidMoves.js";
-import { isGameEffectivelyOver } from "../detectGameEnd.js";
+import { bestBeneficialMove, isGameEffectivelyOver, lifeAwareMargin, MIN_BENEFICIAL_MARGIN } from "../detectGameEnd.js";
 
 /**
  * HTTP client for the standalone Python inference service (ai-service/, see its
@@ -97,6 +97,18 @@ export async function checkNeuralServiceHealth(
  * even once the position is fully settled. Running isGameEffectivelyOver first means
  * "Experta" passes correctly regardless of what the model itself would have guessed, and
  * skips an unnecessary request to the (possibly cold) hosted service in that case too.
+ *
+ * Getting past that check only means *some* legal move still gains something — it doesn't
+ * mean the network's own top pick is that move. Real professional game records essentially
+ * never show the actual dame-filling sequence at all (the exporting server stops recording
+ * at the last stone that mattered — see ai-service/config.yaml's dataset notes), so the
+ * network has barely any training signal for "which neutral point to take" and can pick
+ * one that gains nothing (e.g. filling its own already-settled territory) while a real
+ * point sits unclaimed elsewhere. This is caught below by checking the network's own
+ * choice against the same margin isGameEffectivelyOver uses, and overridden with
+ * bestBeneficialMove only when the network's pick provably gained nothing — never merely
+ * because a bigger margin existed elsewhere, which would second-guess real reading/shape
+ * judgment the margin heuristic can't do.
  */
 export async function chooseNeuralMove(gameState: GameState, aiColor: Player): Promise<Position | null> {
   if (!NEURAL_AI_SUPPORTED_BOARD_SIZES.includes(gameState.boardSize)) {
@@ -126,5 +138,20 @@ export async function chooseNeuralMove(gameState: GameState, aiColor: Player): P
   }
 
   const body = (await response.json()) as MoveResponseBody;
-  return body.move;
+  const networkMove = body.move;
+
+  const before = lifeAwareMargin(gameState.board, gameState.boardSize, aiColor, 0, gameState.komi);
+  const networkCandidate = networkMove
+    ? moves.find((m) => m.position.row === networkMove.row && m.position.col === networkMove.col)
+    : null;
+  const networkMargin = networkCandidate
+    ? lifeAwareMargin(networkCandidate.resultingBoard, gameState.boardSize, aiColor, networkCandidate.capturedCount, gameState.komi) - before
+    : 0; // the network chose to pass (or, defensively, an unrecognized point) -- same as "gains nothing"
+
+  if (networkMargin < MIN_BENEFICIAL_MARGIN) {
+    const better = bestBeneficialMove(gameState.board, gameState.boardSize, gameState.komi, aiColor, moves);
+    if (better) return better.position;
+  }
+
+  return networkMove;
 }
