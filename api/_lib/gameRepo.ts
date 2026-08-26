@@ -395,7 +395,10 @@ export function isExpiredWaitingGame(game: OnlineGame): boolean {
  * concurrent requests can never silently clobber each other. Always refetches the full
  * roster afterwards, since some callers (join/leave) only touch game_players directly.
  */
-export async function applyGameUpdate(game: OnlineGame, patch: Record<string, unknown>): Promise<OnlineGame> {
+export async function applyGameUpdate(
+  game: OnlineGame,
+  patch: Partial<Omit<GameRow, "id" | "version" | "created_at" | "updated_at">>
+): Promise<OnlineGame> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("games")

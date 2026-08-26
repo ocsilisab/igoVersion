@@ -193,7 +193,7 @@ export async function submitHand(gameId: string, guestId: string, deckIds: strin
 
   const hand = drawHand(ownedValidIds);
   const otherHandAlreadySet = side === "host" ? row.guest_hand !== null : row.host_hand !== null;
-  const patch: Record<string, unknown> = side === "host" ? { host_hand: hand } : { guest_hand: hand };
+  const patch: Partial<CardGameRow> = side === "host" ? { host_hand: hand } : { guest_hand: hand };
   if (otherHandAlreadySet) {
     patch.status = "playing";
     patch.started_at = new Date().toISOString();
@@ -204,7 +204,11 @@ export async function submitHand(gameId: string, guestId: string, deckIds: strin
     .from("card_games")
     .update({ ...patch, version: row.version + 1, updated_at: new Date().toISOString() })
     .eq("id", row.id)
-    .eq("version", row.version)
+    // Host and guest submit their hand independently and roughly at the same time --
+    // gating on the whole row's `version` (like games' turn-based updates do) would make
+    // whichever side's write loses the race get bounced as a false conflict, even though
+    // they write disjoint columns. Gate on this side's own hand still being unset instead.
+    .is(side === "host" ? "host_hand" : "guest_hand", null)
     .select("*")
     .maybeSingle();
   if (error) throw Errors.serverError();
@@ -236,7 +240,7 @@ export async function submitAnswer(gameId: string, guestId: string, row: number,
   if (!card) throw Errors.serverError();
 
   const correct = card.problem.solution.row === row && card.problem.solution.col === col;
-  const patch: Record<string, unknown> = {};
+  const patch: Partial<CardGameRow> = {};
 
   if (correct) {
     const newProgress = progress + 1;
@@ -255,7 +259,12 @@ export async function submitAnswer(gameId: string, guestId: string, row: number,
     .from("card_games")
     .update({ ...patch, version: gameRow.version + 1, updated_at: new Date().toISOString() })
     .eq("id", gameRow.id)
-    .eq("version", gameRow.version)
+    .eq("status", "playing")
+    // Host and guest answer concurrently throughout the whole race -- gating on the whole
+    // row's `version` would make one side's answer get bounced as a false conflict every
+    // time it lands right after the other side's own (unrelated) answer bumped it. Gate on
+    // this side's own progress instead, which only this side ever writes.
+    .eq(side === "host" ? "host_progress" : "guest_progress", progress)
     .select("*")
     .maybeSingle();
   if (error) throw Errors.serverError();
