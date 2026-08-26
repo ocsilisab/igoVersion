@@ -41,7 +41,14 @@ export async function checkRateLimit(req: VercelRequest, options: RateLimitOptio
     p_limit: limit,
     p_window_seconds: windowSeconds,
   });
-  if (error) throw error;
+  if (error) {
+    // Fail open: this throttle is best-effort (see the docstring above), so a transient
+    // Supabase hiccup or a schema.sql not yet re-run in this environment should degrade to
+    // "allow the request", not take down every endpoint under /api/games and /api/cards
+    // that calls this as their first line.
+    console.error("checkRateLimit: check_and_record_rate_limit RPC failed, failing open", error);
+    return true;
+  }
 
   // Opportunistic cleanup of this key's old rows so the table doesn't grow forever.
   const staleBefore = new Date(Date.now() - windowSeconds * 1000 * 20).toISOString();

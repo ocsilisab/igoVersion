@@ -2,6 +2,12 @@
 --
 -- Run this once in the Supabase project's SQL editor (Project → SQL Editor → New query).
 -- Safe to re-run: every statement is idempotent (IF NOT EXISTS / OR REPLACE / DROP+CREATE).
+--
+-- Last change: 2026-08-26 — added check_and_record_rate_limit() and
+-- dead_stones_confirmed_teams. There's no migration tooling here, so this file is the
+-- only record of what production should look like: bump this date whenever you add a
+-- statement below, and re-run the whole file in the SQL editor after pulling a change
+-- to it -- there is no automatic way to tell a deployed database's schema is behind.
 
 create extension if not exists pgcrypto;
 
@@ -100,6 +106,16 @@ drop policy if exists "Public read access" on games;
 create policy "Public read access" on games
   for select
   using (true);
+
+-- Known, deliberately-accepted tradeoff: `using (true)` lets anyone holding the anon key
+-- list every game ever played directly via REST (not just what the app's own lobby
+-- exposes), bypassing the app's rate limiting for that read. Board state itself isn't
+-- sensitive (no hidden information in Go), so the impact is just enumeration + a
+-- rate-limit bypass, not data exposure. Restricting this (e.g. to `status = 'waiting'`)
+-- was considered and rejected: Realtime's postgres_changes delivery for a row a client
+-- can no longer SELECT could plausibly stop firing for that client, breaking live
+-- updates for in-progress games -- a real risk that can't be verified without a live
+-- Supabase project to test against.
 
 -- Intentionally no insert/update/delete policy for anon/authenticated roles:
 -- only the service-role key (used exclusively by the /api serverless functions)
@@ -231,6 +247,13 @@ begin
   return true;
 end;
 $$;
+
+-- Postgres grants EXECUTE on a new function to PUBLIC by default, and Supabase exposes
+-- every public-schema function as a callable RPC endpoint (/rest/v1/rpc/...) -- without
+-- this, anyone holding the anon key (public by design) could call this function directly
+-- with their own arbitrary p_limit/p_ip_hash/p_action, bypassing the /api layer entirely.
+revoke execute on function check_and_record_rate_limit(text, text, integer, integer) from public;
+grant execute on function check_and_record_rate_limit(text, text, integer, integer) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- card_games
