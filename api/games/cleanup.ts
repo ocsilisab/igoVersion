@@ -7,11 +7,13 @@ import { getSupabaseAdmin } from "../_lib/supabaseAdmin.js";
 const STALE_FINISHED_HOURS = 24;
 
 /**
- * Maintenance endpoint: deletes `waiting` games past their expiry, and prunes old
- * `finished`/`abandoned` games (no permanent match history is kept — see the prompt's
- * scope). Not wired to a cron automatically; call it manually or point a Vercel Cron
- * Job at it with the same bearer token. Protected by AUTH_SECRET so it can't be
- * triggered by random internet traffic.
+ * Maintenance endpoint: deletes `waiting` games/card_games past their expiry, and prunes
+ * old `finished`/`abandoned` rows from both tables (no permanent match history is kept —
+ * see the prompt's scope). Also covers card_games so it doesn't need its own function —
+ * the Vercel Hobby plan caps serverless functions at 12 and this project was already at
+ * 10. Not wired to a cron automatically; call it manually or point a Vercel Cron Job at
+ * it with the same bearer token. Protected by AUTH_SECRET so it can't be triggered by
+ * random internet traffic.
  */
 export default withHandler(["POST", "GET"], async (req: VercelRequest, res: VercelResponse) => {
   const authHeader = req.headers.authorization;
@@ -33,5 +35,22 @@ export default withHandler(["POST", "GET"], async (req: VercelRequest, res: Verc
     .in("status", ["finished", "abandoned"])
     .lt("updated_at", staleBefore);
 
-  res.status(200).json({ expiredWaitingDeleted: expiredCount ?? 0, staleFinishedDeleted: staleCount ?? 0 });
+  const { count: expiredCardGamesCount } = await supabase
+    .from("card_games")
+    .delete({ count: "exact" })
+    .eq("status", "waiting")
+    .lt("expires_at", nowIso);
+
+  const { count: staleCardGamesCount } = await supabase
+    .from("card_games")
+    .delete({ count: "exact" })
+    .in("status", ["finished", "abandoned"])
+    .lt("updated_at", staleBefore);
+
+  res.status(200).json({
+    expiredWaitingDeleted: expiredCount ?? 0,
+    staleFinishedDeleted: staleCount ?? 0,
+    expiredWaitingCardGamesDeleted: expiredCardGamesCount ?? 0,
+    staleFinishedCardGamesDeleted: staleCardGamesCount ?? 0,
+  });
 });
