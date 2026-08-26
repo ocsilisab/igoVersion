@@ -30,6 +30,11 @@ ai-service/checkpoints/*
 !ai-service/checkpoints/best.pt
 !ai-service/checkpoints/best_9x9.pt
 !ai-service/checkpoints/best_13x13.pt
+# Policy+Value checkpoint (see train_policy_value.py) -- same reasoning, only best.pt
+# (not last.pt, which is resume-only state) needs to ship for Render's Docker build.
+!ai-service/checkpoints/policy_value
+!ai-service/checkpoints/policy_value/best.pt
+ai-service/checkpoints/policy_value/last.pt
 ai-service/checkpoints_9x9
 ai-service/checkpoints_13x13
 ai-service/__pycache__
