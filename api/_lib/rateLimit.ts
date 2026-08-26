@@ -24,29 +24,28 @@ export interface RateLimitOptions {
  * Best-effort per-IP throttle backed by a small Postgres table (not an anti-cheat
  * system — see supabase/schema.sql::rate_limit_hits). The IP itself is never stored,
  * only an HMAC of it, and it is used purely as a throttling key, never as player identity.
+ *
+ * The actual count-then-insert runs atomically in a single Postgres function call (see
+ * check_and_record_rate_limit in schema.sql) rather than as two separate round trips here
+ * — two round trips would let a concurrent burst of requests all read "under the limit"
+ * before any of their inserts land, letting the burst exceed `limit`.
  */
 export async function checkRateLimit(req: VercelRequest, options: RateLimitOptions): Promise<boolean> {
   const { action, limit, windowSeconds } = options;
   const ipHash = hashIp(getClientIp(req));
   const supabase = getSupabaseAdmin();
-  const windowStart = new Date(Date.now() - windowSeconds * 1000).toISOString();
 
-  const { count } = await supabase
-    .from("rate_limit_hits")
-    .select("id", { count: "exact", head: true })
-    .eq("ip_hash", ipHash)
-    .eq("action", action)
-    .gte("created_at", windowStart);
-
-  if ((count ?? 0) >= limit) {
-    return false;
-  }
-
-  await supabase.from("rate_limit_hits").insert({ ip_hash: ipHash, action });
+  const { data: allowed, error } = await supabase.rpc("check_and_record_rate_limit", {
+    p_ip_hash: ipHash,
+    p_action: action,
+    p_limit: limit,
+    p_window_seconds: windowSeconds,
+  });
+  if (error) throw error;
 
   // Opportunistic cleanup of this key's old rows so the table doesn't grow forever.
   const staleBefore = new Date(Date.now() - windowSeconds * 1000 * 20).toISOString();
   void supabase.from("rate_limit_hits").delete().eq("ip_hash", ipHash).eq("action", action).lt("created_at", staleBefore);
 
-  return true;
+  return Boolean(allowed);
 }

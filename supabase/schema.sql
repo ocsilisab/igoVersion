@@ -197,6 +197,41 @@ create index if not exists rate_limit_hits_lookup on rate_limit_hits (ip_hash, a
 alter table rate_limit_hits enable row level security;
 -- No policies at all: only the service role touches this table.
 
+-- Counts this key's recent hits and records a new one in a single call, instead of the
+-- API doing a separate select then insert (two round trips a concurrent burst of requests
+-- could both pass before either's insert lands, letting the burst exceed `p_limit`). The
+-- advisory lock serializes concurrent callers for the *same* ip_hash+action so the
+-- count-then-insert below is effectively atomic for that key, without locking the whole
+-- table or affecting unrelated keys. Released automatically when the calling transaction
+-- ends (each RPC call from Supabase runs in its own transaction).
+create or replace function check_and_record_rate_limit(
+  p_ip_hash text,
+  p_action text,
+  p_limit integer,
+  p_window_seconds integer
+) returns boolean
+language plpgsql
+as $$
+declare
+  v_count integer;
+begin
+  perform pg_advisory_xact_lock(hashtextextended(p_ip_hash || ':' || p_action, 0));
+
+  select count(*) into v_count
+  from rate_limit_hits
+  where ip_hash = p_ip_hash
+    and action = p_action
+    and created_at >= now() - (p_window_seconds || ' seconds')::interval;
+
+  if v_count >= p_limit then
+    return false;
+  end if;
+
+  insert into rate_limit_hits (ip_hash, action) values (p_ip_hash, p_action);
+  return true;
+end;
+$$;
+
 -- ---------------------------------------------------------------------------
 -- card_games
 -- ---------------------------------------------------------------------------
