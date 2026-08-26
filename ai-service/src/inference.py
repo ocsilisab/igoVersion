@@ -18,6 +18,7 @@ from src.adapters.game_adapter import (
     label_to_move,
 )
 from src.legal_moves import is_legal_move
+from src.mcts import MCTSConfig, make_root_node, run_search, select_final_move
 from src.model import PolicyValueNetwork
 
 
@@ -36,6 +37,21 @@ class PredictionWithValueResult(PredictionResult):
     # +1 = very favorable for the player to move now, 0 = balanced, -1 = very
     # unfavorable -- see model.py::PolicyValueNetwork's docstring for the convention.
     value: float
+
+
+class ScoredMCTSMove(TypedDict):
+    move: Optional[dict]
+    visits: int
+    probability: float  # visits / total root visits -- NOT a network probability
+    q_value: float  # how good this move looks for whoever plays it (see mcts.py)
+    prior: float  # the Policy Network's raw prior for this move, before search
+
+
+class MCTSPredictionResult(TypedDict):
+    best_move: Optional[dict]
+    simulations: int
+    root_visits: int
+    top_moves: List[ScoredMCTSMove]
 
 
 def _move_to_json(move) -> Optional[dict]:
@@ -140,4 +156,58 @@ def predict_move_and_value(
         "probability": best["probability"],
         "top_moves": top_moves,
         "value": value.item(),
+    }
+
+
+def select_move_with_mcts(
+    model: PolicyValueNetwork,
+    board_size: int,
+    state: GameStateInput,
+    history: List[str],
+    device: torch.device,
+    config: Optional[MCTSConfig] = None,
+    consecutive_passes: int = 0,
+    black_captures: int = 0,
+    white_captures: int = 0,
+    komi: float = 6.5,
+    top_n: int = 5,
+) -> MCTSPredictionResult:
+    """Runs a full MCTS/PUCT search (see mcts.py) rooted at `state` and returns the move
+    with the most visits, plus per-move search statistics. Requires a checkpoint trained
+    natively for `board_size` -- unlike predict_move/predict_move_and_value, this never
+    falls back to embed_in_canvas: MCTS's own rules engine (go_board.py/legal_moves.py)
+    always operates on the real board size, so there's nothing to adapt in the search
+    itself, but the network must be able to evaluate that exact size directly.
+
+    `consecutive_passes`/`black_captures`/`white_captures`/`komi` seed the root with the
+    real game's own state -- without them a fresh root can't correctly detect "one more
+    pass ends the game" or score a terminal node the search reaches partway through."""
+    cfg = config or MCTSConfig()
+    root = make_root_node(
+        state,
+        history,
+        consecutive_passes=consecutive_passes,
+        black_captures=black_captures,
+        white_captures=white_captures,
+    )
+    simulations_run = run_search(root, board_size, model, device, cfg, komi=komi)
+    best_move = select_final_move(root, cfg.temperature)
+
+    ranked = sorted(root.children.values(), key=lambda child: child.visit_count, reverse=True)
+    top_moves: List[ScoredMCTSMove] = [
+        {
+            "move": _move_to_json(child.move),
+            "visits": child.visit_count,
+            "probability": (child.visit_count / root.visit_count) if root.visit_count > 0 else 0.0,
+            "q_value": -child.q_value,  # negated: value of the move FOR whoever plays it, not for the opponent to move next
+            "prior": child.prior,
+        }
+        for child in ranked[:top_n]
+    ]
+
+    return {
+        "best_move": _move_to_json(best_move),
+        "simulations": simulations_run,
+        "root_visits": root.visit_count,
+        "top_moves": top_moves,
     }

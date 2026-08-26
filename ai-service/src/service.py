@@ -16,16 +16,21 @@ from typing import Dict, List, Optional
 
 import torch
 import torch.nn as nn
+import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from src.adapters.game_adapter import BOARD_SIZE, SUPPORTED_BOARD_SIZES, GameStateInput, Player, Stone
-from src.inference import predict_move, predict_move_and_value
+from src.inference import predict_move, predict_move_and_value, select_move_with_mcts
+from src.mcts import MCTSConfig
 from src.model import PolicyValueNetwork, load_model_from_checkpoint, load_policy_value_checkpoint
 
 SERVICE_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG_PATH = SERVICE_ROOT / "config.yaml"
+# Mirrors src/types/game.ts::DEFAULT_KOMI -- only used as MCTS's terminal-scoring
+# fallback when a request doesn't say what komi the real game is using.
+DEFAULT_KOMI = 6.5
 
 # One checkpoint filename per board size, all under checkpoints/ -- 19x19 keeps its
 # original name (that's the one already deployed) rather than being renamed to match.
@@ -77,9 +82,24 @@ class ModelState:
     models: Dict[int, nn.Module] = {}
     value_models: Dict[int, PolicyValueNetwork] = {}
     device: torch.device = torch.device("cpu")
+    mcts_defaults: MCTSConfig = MCTSConfig()
 
 
 state = ModelState()
+
+
+def _load_mcts_defaults(config_path: Path) -> MCTSConfig:
+    if not config_path.exists():
+        return MCTSConfig()
+    with open(config_path, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f) or {}
+    mcts_cfg = config.get("mcts", {})
+    return MCTSConfig(
+        simulations=mcts_cfg.get("simulations", 400),
+        c_puct=mcts_cfg.get("c_puct", 1.5),
+        time_limit_ms=mcts_cfg.get("time_limit_ms"),
+        temperature=mcts_cfg.get("temperature", 0.0),
+    )
 
 
 def _resolve_checkpoint_path(board_size: int) -> Path:
@@ -104,6 +124,7 @@ def _resolve_value_checkpoint_path(board_size: int) -> Path:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     state.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    state.mcts_defaults = _load_mcts_defaults(DEFAULT_CONFIG_PATH)
     for board_size in SUPPORTED_BOARD_SIZES:
         checkpoint_path = _resolve_checkpoint_path(board_size)
         if checkpoint_path.exists():
@@ -183,3 +204,90 @@ def ai_move(request: MoveRequest) -> MoveResponse:
         )
 
     return predict_move(model, model_board_size, game_state, request.history, state.device, top_n=request.top_n)
+
+
+class MCTSMoveRequest(MoveRequest):
+    # All of these seed the search root with the real game's own state -- without them
+    # a fresh root can't correctly detect "one more pass ends the game" or score a
+    # terminal node reached partway through the search (see mcts.py::make_root_node).
+    consecutive_passes: int = 0
+    black_captures: int = 0
+    white_captures: int = 0
+    komi: float = DEFAULT_KOMI
+    # Any of these left unset falls back to config.yaml's `mcts:` section (see
+    # ModelState.mcts_defaults) -- e.g. a "dificil"/"experto" difficulty preset only
+    # needs to override `simulations`, not repeat every other field.
+    simulations: Optional[int] = Field(default=None, ge=1)
+    c_puct: Optional[float] = None
+    time_limit_ms: Optional[int] = Field(default=None, ge=1)
+    temperature: Optional[float] = Field(default=None, ge=0)
+
+
+class ScoredMCTSMoveResponse(BaseModel):
+    move: Optional[PositionPayload]
+    visits: int
+    probability: float
+    q_value: float
+    prior: float
+
+
+class MCTSMoveResponse(BaseModel):
+    best_move: Optional[PositionPayload]
+    simulations: int
+    root_visits: int
+    top_moves: List[ScoredMCTSMoveResponse]
+
+
+@app.post("/ai/move/mcts", response_model=MCTSMoveResponse)
+def ai_move_mcts(request: MCTSMoveRequest) -> MCTSMoveResponse:
+    """Same board/position contract as /ai/move, but the move comes from a full MCTS
+    search (see mcts.py) instead of reading the Policy Network's top prediction
+    directly. Only available for board sizes with a trained Policy+Value checkpoint
+    (see /health's value_models_loaded) -- MCTS's rules engine always runs at the real
+    board size, with no embed_in_canvas fallback (see select_move_with_mcts)."""
+    if request.board_size not in SUPPORTED_BOARD_SIZES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"board_size soportados: {SUPPORTED_BOARD_SIZES}, se recibio {request.board_size}.",
+        )
+    if len(request.board) != request.board_size or any(len(row) != request.board_size for row in request.board):
+        raise HTTPException(status_code=400, detail="Las dimensiones de 'board' no coinciden con board_size.")
+
+    value_model = state.value_models.get(request.board_size)
+    if value_model is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"No hay checkpoint Policy+Value para board_size={request.board_size} "
+                f"(disponibles: {sorted(state.value_models.keys())}). MCTS no puede usar embed_in_canvas."
+            ),
+        )
+
+    game_state = GameStateInput(
+        board=request.board,
+        board_size=request.board_size,
+        current_player=request.current_player,
+        recent_moves=[None if m is None else (m.row, m.col) for m in request.recent_moves],
+    )
+
+    defaults = state.mcts_defaults
+    config = MCTSConfig(
+        simulations=request.simulations if request.simulations is not None else defaults.simulations,
+        c_puct=request.c_puct if request.c_puct is not None else defaults.c_puct,
+        time_limit_ms=request.time_limit_ms if request.time_limit_ms is not None else defaults.time_limit_ms,
+        temperature=request.temperature if request.temperature is not None else defaults.temperature,
+    )
+
+    return select_move_with_mcts(
+        value_model,
+        request.board_size,
+        game_state,
+        request.history,
+        state.device,
+        config=config,
+        consecutive_passes=request.consecutive_passes,
+        black_captures=request.black_captures,
+        white_captures=request.white_captures,
+        komi=request.komi,
+        top_n=request.top_n,
+    )

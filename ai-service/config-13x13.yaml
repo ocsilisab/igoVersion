@@ -52,3 +52,9 @@ fine_tuning:
   enabled: true
   learning_rate: 0.0001
   epochs: 10
+
+mcts:
+  simulations: 400
+  c_puct: 1.5
+  time_limit_ms: null
+  temperature: 0.0

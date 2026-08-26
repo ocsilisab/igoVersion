@@ -66,3 +66,32 @@ fine_tuning:
   enabled: true
   learning_rate: 0.0001
   epochs: 10
+
+# MCTS + PUCT (ver src/mcts.py) -- busqueda encima de la Policy+Value ya entrenada, solo
+# disponible para tamanos con checkpoint policy_value/*.pt (ver service.py).
+#
+# Medido con src/benchmark_mcts.py sobre el checkpoint 19x19 real (RTX 5060, busqueda
+# secuencial sin batching -- ver mcts.py::evaluate_batch para la interfaz ya preparada
+# para eso mas adelante):
+#   directa (sin MCTS): ~144ms/jugada
+#   100  simulaciones:  ~2.7s/jugada  (~36 sims/s)
+#   200  simulaciones:  ~5.4s/jugada
+#   400  simulaciones: ~11.3s/jugada
+#   800  simulaciones: ~23.5s/jugada
+#   1600 simulaciones: ~51.6s/jugada
+# Sin batching, cada simulacion adicional cuesta ~28ms fijos -- para jugar en tiempo
+# real (POST /ai/move/mcts, campo `simulations` por request) 100 es razonable como techo
+# de "dificil" hasta implementar inferencia por lotes; 800+ solo tiene sentido con un
+# limite de tiempo (`time_limit_ms`) y advirtiendo al usuario de la espera, o para
+# analisis fuera de linea sin restriccion de tiempo real.
+mcts:
+  simulations: 400
+  c_puct: 1.5
+  # null = usar solo `simulations`; en milisegundos, para detener la busqueda antes si
+  # se alcanza el limite de tiempo primero (util para dificultades por tiempo, no solo
+  # por numero de simulaciones -- ver POST /ai/move/mcts).
+  time_limit_ms: null
+  # 0 (o cualquier valor por debajo del umbral interno) = determinista: siempre la
+  # jugada mas visitada. >0 solo tiene sentido para self-play futuro, no para jugar
+  # normal -- ver mcts.py::select_final_move.
+  temperature: 0.0
