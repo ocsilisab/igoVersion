@@ -19,7 +19,7 @@ import torch.nn as nn
 import yaml
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from src.adapters.game_adapter import BOARD_SIZE, SUPPORTED_BOARD_SIZES, GameStateInput, Player, Stone
 from src.inference import predict_move, predict_move_and_value, select_move_with_mcts
@@ -48,18 +48,42 @@ class PositionPayload(BaseModel):
     col: int
 
 
+# This endpoint is public and unauthenticated with no other rate limiting in this service
+# (see MCTSMoveRequest's simulations/time_limit_ms bounds below for the same reasoning) --
+# board/board_size/history had no size bound at all, so a body with a wildly oversized
+# `board` (e.g. tens of thousands of rows) or a `history` with hundreds of thousands of
+# entries would get fully parsed and validated into Python objects before the handler's own
+# "board_size not supported" check ever runs. These bounds are deliberately a little above
+# the real ceiling (BOARD_SIZE, the largest supported size) rather than exactly at it, so a
+# legitimate request is never rejected here -- the handler's own SUPPORTED_BOARD_SIZES check
+# still does the precise validation.
+_MAX_BOARD_DIMENSION = BOARD_SIZE + 1
+_MAX_HISTORY_ENTRIES = 2000
+
+
 class MoveRequest(BaseModel):
     board: List[List[Stone]] = Field(..., description="board_size x board_size, \"black\"/\"white\"/null")
-    board_size: int = BOARD_SIZE
+    board_size: int = Field(default=BOARD_SIZE, ge=1, le=_MAX_BOARD_DIMENSION)
     current_player: Player
     recent_moves: List[Optional[PositionPayload]] = Field(
         default_factory=list, description="Most-recent-first, up to 3 entries; null = pass or no earlier move"
     )
     history: List[str] = Field(
         default_factory=list,
+        max_length=_MAX_HISTORY_ENTRIES,
         description="Serialized board states (app's GameState.history), oldest first -- needed for the Ko check",
     )
     top_n: int = Field(default=5, ge=1, le=20)
+
+    @field_validator("board", mode="before")
+    @classmethod
+    def _bound_board_shape(cls, value: object) -> object:
+        if not isinstance(value, list) or len(value) > _MAX_BOARD_DIMENSION:
+            raise ValueError(f"'board' no puede tener mas de {_MAX_BOARD_DIMENSION} filas.")
+        for row in value:
+            if not isinstance(row, list) or len(row) > _MAX_BOARD_DIMENSION:
+                raise ValueError(f"cada fila de 'board' no puede tener mas de {_MAX_BOARD_DIMENSION} columnas.")
+        return value
 
 
 class ScoredMoveResponse(BaseModel):

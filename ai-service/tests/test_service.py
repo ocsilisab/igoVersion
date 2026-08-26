@@ -284,3 +284,51 @@ def test_ai_move_mcts_rejects_time_limit_above_the_cap(client):
         },
     )
     assert response.status_code == 422
+
+
+def test_ai_move_rejects_an_oversized_board(client):
+    # Same public/unauthenticated/no-rate-limiting reasoning as the simulations/time_limit_ms
+    # caps above -- a wildly oversized board should never even reach the handler's own
+    # "board_size not supported" check.
+    huge_size = BOARD_SIZE + 50
+    response = client.post(
+        "/ai/move",
+        json={
+            "board": [[None] * huge_size for _ in range(huge_size)],
+            "board_size": huge_size,
+            "current_player": "black",
+            "recent_moves": [],
+            "history": [],
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_ai_move_rejects_a_ragged_row_above_the_cap(client):
+    board = _empty_board_json()
+    board[0] = [None] * (BOARD_SIZE + 50)
+    response = client.post(
+        "/ai/move",
+        json={
+            "board": board,
+            "board_size": BOARD_SIZE,
+            "current_player": "black",
+            "recent_moves": [],
+            "history": [],
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_ai_move_rejects_history_above_the_cap(client):
+    response = client.post(
+        "/ai/move",
+        json={
+            "board": _empty_board_json(),
+            "board_size": BOARD_SIZE,
+            "current_player": "black",
+            "recent_moves": [],
+            "history": ["."] * 2001,
+        },
+    )
+    assert response.status_code == 422

@@ -10,3 +10,7 @@ uvicorn[standard]==0.52.4
 # even though uvicorn[standard]'s extras happen to pull it in today too -- relying on that
 # transitively would silently break the whole service on the day that stops being true.
 pyyaml==6.0.3
+# service.py imports pydantic directly for its request/response models (MoveRequest,
+# MCTSMoveRequest, etc.) -- listed explicitly for the same reason as pyyaml above, even
+# though fastapi already requires it transitively today.
+pydantic==2.13.4
