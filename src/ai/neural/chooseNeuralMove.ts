@@ -31,6 +31,17 @@ export interface NeuralServiceHealth {
 
 const DEFAULT_SERVICE_URL = "http://localhost:8000";
 
+/**
+ * Generous enough to survive one Render free-tier cold start (~30-50s, see
+ * checkNeuralServiceHealth's docstring) if the service fell back asleep mid-game while the
+ * human player was thinking -- the health check at game setup only proves it was warm
+ * *then*, not for the whole game. Bounded rather than left to the browser/OS's own TCP
+ * timeout (which can be minutes, or effectively unbounded on some networks) so a sleeping
+ * service degrades to the "facil" fallback (see useAiGoGame.ts's catch) in a predictable
+ * amount of time instead of leaving the game looking frozen on "La IA esta pensando...".
+ */
+const MOVE_REQUEST_TIMEOUT_MS = 45_000;
+
 function serviceUrl(): string {
   const fromEnv = import.meta.env.VITE_AI_SERVICE_URL as string | undefined;
   return (fromEnv && fromEnv.trim()) || DEFAULT_SERVICE_URL;
@@ -120,18 +131,26 @@ export async function chooseNeuralMove(gameState: GameState, aiColor: Player): P
     return null;
   }
 
-  const response = await fetch(`${serviceUrl()}/ai/move`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      board: gameState.board,
-      board_size: gameState.boardSize,
-      current_player: aiColor,
-      recent_moves: gameState.recentMoves,
-      history: gameState.history,
-      top_n: 5,
-    }),
-  });
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), MOVE_REQUEST_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${serviceUrl()}/ai/move`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        board: gameState.board,
+        board_size: gameState.boardSize,
+        current_player: aiColor,
+        recent_moves: gameState.recentMoves,
+        history: gameState.history,
+        top_n: 5,
+      }),
+      signal: controller.signal,
+    });
+  } finally {
+    window.clearTimeout(timer);
+  }
 
   if (!response.ok) {
     throw new Error(`El servicio de IA neuronal respondio ${response.status}`);
