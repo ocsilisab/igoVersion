@@ -251,3 +251,36 @@ def test_ai_move_mcts_rejects_unsupported_board_size(client):
         },
     )
     assert response.status_code == 400
+
+
+def test_ai_move_mcts_rejects_simulations_above_the_cap(client):
+    # This endpoint is public and unauthenticated with no other rate limiting in this
+    # service -- an unbounded `simulations` would tie up the shared CPU for minutes per
+    # request. Pydantic's le= should reject this before any search ever runs.
+    response = client.post(
+        "/ai/move/mcts",
+        json={
+            "board": _empty_board_json(),
+            "board_size": BOARD_SIZE,
+            "current_player": "black",
+            "recent_moves": [],
+            "history": [],
+            "simulations": 3_000_000,
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_ai_move_mcts_rejects_time_limit_above_the_cap(client):
+    response = client.post(
+        "/ai/move/mcts",
+        json={
+            "board": _empty_board_json(),
+            "board_size": BOARD_SIZE,
+            "current_player": "black",
+            "recent_moves": [],
+            "history": [],
+            "time_limit_ms": 600_000,
+        },
+    )
+    assert response.status_code == 422

@@ -217,9 +217,16 @@ class MCTSMoveRequest(MoveRequest):
     # Any of these left unset falls back to config.yaml's `mcts:` section (see
     # ModelState.mcts_defaults) -- e.g. a "dificil"/"experto" difficulty preset only
     # needs to override `simulations`, not repeat every other field.
-    simulations: Optional[int] = Field(default=None, ge=1)
+    #
+    # Both have an explicit upper bound: this endpoint is public and unauthenticated, and
+    # MCTS runs synchronously on the request thread with no other rate limiting in this
+    # service (unlike the Vercel API) -- an unbounded `simulations` (or a huge
+    # `time_limit_ms` with no simulation cap to also stop it early) would tie up the
+    # shared Render CPU for minutes at a time per request. 3000 sims / 15s already covers
+    # every documented difficulty tier (see config.yaml's benchmark notes) with margin.
+    simulations: Optional[int] = Field(default=None, ge=1, le=3000)
     c_puct: Optional[float] = None
-    time_limit_ms: Optional[int] = Field(default=None, ge=1)
+    time_limit_ms: Optional[int] = Field(default=None, ge=1, le=15_000)
     temperature: Optional[float] = Field(default=None, ge=0)
 
 
