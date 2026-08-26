@@ -33,6 +33,7 @@ function groupId(stones: Position[]): string {
 }
 
 interface RegionInfo {
+  size: number;
   borderColors: Set<Player>;
   borderGroupIds: Set<string>;
 }
@@ -44,6 +45,7 @@ function floodFillRegion(
   visited: Set<string>,
   groupIdAt: Map<string, string>
 ): RegionInfo {
+  let size = 0;
   const borderColors = new Set<Player>();
   const borderGroupIds = new Set<string>();
   const stack: Position[] = [start];
@@ -51,6 +53,7 @@ function floodFillRegion(
 
   while (stack.length > 0) {
     const pos = stack.pop()!;
+    size++;
     for (const neighbor of getNeighbors(pos, boardSize)) {
       const stone = board[neighbor.row][neighbor.col];
       const key = posKey(neighbor);
@@ -67,20 +70,45 @@ function floodFillRegion(
     }
   }
 
-  return { borderColors, borderGroupIds };
+  return { size, borderColors, borderGroupIds };
 }
 
 /**
- * Suggests which groups are dead when the scoring phase begins, using the classic
- * simplified two-eyes check: a group counts one "eye" for each distinct fully-enclosed
- * (bordered by its own color only) empty region touching it, and is suggested dead if it
- * has fewer than two. This reads the vast majority of settled amateur-game positions
- * correctly, but — like any heuristic that doesn't actually read out capturing races —
- * it can misjudge genuinely ambiguous shapes (seki, bent-four, an eye shared between two
- * separate groups, a group that could still run or connect). It is only ever a starting
- * point: the result seeds `deadStones`, and every mark stays togglable by hand
- * (toggleDeadStoneGroup) exactly as if the player had clicked it themselves, so a wrong
- * guess is always one click away from being corrected before finalizing.
+ * An enclosed space at least this big is treated as unconditionally safe on its own,
+ * without needing a second, separate eye — the classic Go rule of thumb ("six die,
+ * eight live"): a connected space this size can always be shaped into two eyes no
+ * matter what the opponent plays inside it. Below this size a single region is only
+ * *sometimes* alive depending on its exact shape (straight-three, bent-four, and the
+ * rest of the nakade table) — too fine-grained to classify correctly here, so a region
+ * under this size only ever counts toward the "two separate small eyes" signal below,
+ * never toward this one on its own.
+ */
+const SAFE_TERRITORY_SIZE = 6;
+
+/**
+ * Suggests which groups are dead when the scoring phase begins. A group is treated as
+ * alive (not suggested) if either signal holds:
+ *   - it borders at least one single-color-bordered empty region of SAFE_TERRITORY_SIZE
+ *     or more (one big open territory, not yet subdivided into separate eyes, which is
+ *     exactly what a real end-of-game board almost always looks like — nobody bothers
+ *     to fill in their own obvious territory before passing); or
+ *   - it borders at least two *separate* smaller such regions (the classic "two eyes"
+ *     shape once territory genuinely has been divided).
+ * Anything satisfying neither is suggested dead.
+ *
+ * An earlier version only ever counted "one region = one eye" regardless of size, which
+ * meant almost every normal living group — whose whole territory is one big undivided
+ * space at the moment both players pass — registered as having just one eye and got
+ * suggested dead. This is why most groups were showing up dead by default instead of
+ * just the rare genuine corpse; the size-based signal above is what actually fixes that.
+ *
+ * Like any heuristic that doesn't actually read out capturing races, this can still
+ * misjudge genuinely ambiguous shapes (seki, bent-four, an eye shared between two
+ * separate groups, a group that could still run or connect, or an under-6 region whose
+ * specific shape happens to be dead). It is only ever a starting point: the result seeds
+ * `deadStones`, and every mark stays togglable by hand (toggleDeadStoneGroup) exactly as
+ * if the player had clicked it themselves, so a wrong guess is always one click away
+ * from being corrected before finalizing.
  */
 export function suggestDeadGroups(board: Board, boardSize: BoardSize): Set<string> {
   const groupIdAt = new Map<string, string>();
@@ -105,7 +133,8 @@ export function suggestDeadGroups(board: Board, boardSize: BoardSize): Set<strin
   }
 
   const visitedEmpty = new Set<string>();
-  const eyeCounts = new Map<string, number>();
+  const smallEyeCounts = new Map<string, number>();
+  const hasSafeTerritory = new Set<string>();
 
   for (let row = 0; row < boardSize; row++) {
     for (let col = 0; col < boardSize; col++) {
@@ -113,18 +142,23 @@ export function suggestDeadGroups(board: Board, boardSize: BoardSize): Set<strin
       const key = posKey({ row, col });
       if (visitedEmpty.has(key)) continue;
 
-      const { borderColors, borderGroupIds } = floodFillRegion(board, { row, col }, boardSize, visitedEmpty, groupIdAt);
-      if (borderColors.size !== 1) continue; // touches both colors (or nothing) — not an eye space
+      const { size, borderColors, borderGroupIds } = floodFillRegion(board, { row, col }, boardSize, visitedEmpty, groupIdAt);
+      if (borderColors.size !== 1) continue; // touches both colors (or nothing) — not territory for anyone
 
       for (const id of borderGroupIds) {
-        eyeCounts.set(id, (eyeCounts.get(id) ?? 0) + 1);
+        if (size >= SAFE_TERRITORY_SIZE) {
+          hasSafeTerritory.add(id);
+        } else {
+          smallEyeCounts.set(id, (smallEyeCounts.get(id) ?? 0) + 1);
+        }
       }
     }
   }
 
   const suggested = new Set<string>();
   for (const [id, stones] of groupsById) {
-    if ((eyeCounts.get(id) ?? 0) < 2) {
+    const alive = hasSafeTerritory.has(id) || (smallEyeCounts.get(id) ?? 0) >= 2;
+    if (!alive) {
       for (const p of stones) suggested.add(posKey(p));
     }
   }
