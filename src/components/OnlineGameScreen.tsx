@@ -283,24 +283,29 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
               {you?.isCreator ? "Cancelar partida" : "Salir"}
             </button>
           </div>
+        ) : isFull ? (
+          <div className="online-waiting-actions">
+            <p>Esta partida ya está completa.</p>
+            <button className="btn btn-secondary" onClick={onExit}>
+              Volver al inicio
+            </button>
+          </div>
         ) : (
-          !isFull && (
-            <div className="online-join-panel">
-              <input
-                className="setup-input"
-                type="text"
-                value={joinName}
-                onChange={(e) => setJoinName(e.target.value)}
-                placeholder="Tu nombre (opcional)"
-                aria-label="Tu nombre"
-                maxLength={24}
-                disabled={isJoining}
-              />
-              <button className="btn btn-primary" onClick={() => void handleJoin()} disabled={isJoining}>
-                {isJoining ? "Uniéndose…" : "Unirse a esta partida"}
-              </button>
-            </div>
-          )
+          <div className="online-join-panel">
+            <input
+              className="setup-input"
+              type="text"
+              value={joinName}
+              onChange={(e) => setJoinName(e.target.value)}
+              placeholder="Tu nombre (opcional)"
+              aria-label="Tu nombre"
+              maxLength={24}
+              disabled={isJoining}
+            />
+            <button className="btn btn-primary" onClick={() => void handleJoin()} disabled={isJoining}>
+              {isJoining ? "Uniéndose…" : "Unirse a esta partida"}
+            </button>
+          </div>
         )}
 
         {isMember && (
