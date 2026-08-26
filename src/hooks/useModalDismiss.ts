@@ -10,16 +10,25 @@ const FOCUSABLE_SELECTOR =
  */
 export function useModalDismiss<T extends HTMLElement>(onClose: () => void) {
   const ref = useRef<T>(null);
+  // A caller that passes an inline onClose (a new function identity every render, e.g.
+  // OnlineGameScreen's polling causing frequent re-renders) must not re-run the effects
+  // below -- always reading the latest onClose through this ref instead of putting it in
+  // a dependency array keeps both mount-only, so focus is only ever moved once.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
-    const dialog = ref.current;
-    dialog?.focus();
+    ref.current?.focus();
+  }, []);
 
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
+
+      const dialog = ref.current;
       if (event.key !== "Tab" || !dialog) return;
 
       const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
@@ -38,7 +47,7 @@ export function useModalDismiss<T extends HTMLElement>(onClose: () => void) {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  }, []);
 
   return ref;
 }
