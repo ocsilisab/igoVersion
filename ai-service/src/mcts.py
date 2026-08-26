@@ -35,6 +35,17 @@ def _opponent(player: Player) -> Player:
     return "white" if player == "black" else "black"
 
 
+def _advance_history(history: List[str], new_state: str) -> List[str]:
+    """is_legal_move's Ko check (legal_moves.py) only ever reads history[-2] -- the same
+    contract src/ai/mcts/node.ts::advanceHistory relies on on the TS side, and for the same
+    reason: keeping the *actual* full history (as this used to do, via `history + [x]`) on
+    every single rollout ply makes each node's history grow with search depth, so a deep
+    tree ends up copying an ever-longer list on every expansion -- O(depth) per expansion,
+    O(depth^2) total. Bounding it to the last 2 entries keeps expansion O(1) regardless of
+    how deep the tree gets."""
+    return [history[-1], new_state] if history else [new_state]
+
+
 @dataclass
 class MCTSConfig:
     simulations: int = 400
@@ -158,7 +169,7 @@ def expand(node: MCTSNode, board_size: int, model: PolicyValueNetwork, device: t
         child = MCTSNode(
             board=child_board,
             player_to_move=opponent,
-            history=node.history + [serialize_board(child_board)],
+            history=_advance_history(node.history, serialize_board(child_board)),
             recent_moves=([pos] + node.recent_moves)[:3],
             consecutive_passes=child_consecutive_passes,
             black_captures=child_black_captures,
