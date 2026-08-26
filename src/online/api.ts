@@ -1,5 +1,6 @@
 import type { BoardSize, ExtensionRules, Player } from "../types/game.js";
 import type { ApiErrorBody, GameMutationResponse, GameResponse, OpenGamesResponse } from "./types.js";
+import { createApiRequest } from "./httpClient.js";
 
 export class OnlineApiError extends Error {
   code: ApiErrorBody["error"];
@@ -10,25 +11,7 @@ export class OnlineApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    ...init,
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...init?.headers },
-  });
-
-  if (!res.ok) {
-    let body: ApiErrorBody = { error: "server_error", message: "Error inesperado. Inténtalo de nuevo." };
-    try {
-      body = await res.json();
-    } catch {
-      // Response wasn't JSON (e.g. a network/edge error page) — keep the fallback message.
-    }
-    throw new OnlineApiError(body);
-  }
-
-  return res.json() as Promise<T>;
-}
+const request = createApiRequest(OnlineApiError);
 
 export function createOnlineGame(
   boardSize: BoardSize,
