@@ -205,5 +205,15 @@ export default function App() {
     return <CardsPlay onBack={() => setScreen("cards-menu")} />;
   }
 
-  return null;
+  // Reachable only if a screen's required config/id is missing (e.g. a reload that lands
+  // on "solo-game" without soloConfig) -- rather than silently rendering a blank page,
+  // send the player somewhere they can act from.
+  return (
+    <div className="app-fallback">
+      <p>Algo ha ido mal y no se puede mostrar esta pantalla.</p>
+      <button className="btn btn-primary" onClick={goHome}>
+        Volver al inicio
+      </button>
+    </div>
+  );
 }
