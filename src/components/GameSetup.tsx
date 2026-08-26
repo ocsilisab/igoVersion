@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { AiDifficulty, BoardSize, ExtensionRules, Player } from "../types/game";
+import { BOARD_SIZES, type AiDifficulty, type BoardSize, type ExtensionRules, type Player } from "../types/game";
 import { DEFAULT_AI_DIFFICULTY, DEFAULT_KOMI, MAX_TOTAL_PLAYERS, NO_EXTENSIONS } from "../types/game";
 import { checkNeuralServiceHealth } from "../ai/neural/chooseNeuralMove";
 import KomiSelector from "./KomiSelector";
@@ -19,7 +19,6 @@ interface GameSetupProps {
   onCancel: () => void;
 }
 
-const BOARD_SIZES: BoardSize[] = [9, 13, 19];
 const MAX_HUMAN_PLAYERS = MAX_TOTAL_PLAYERS - 1; // the AI always takes one seat
 
 const DIFFICULTIES: { value: AiDifficulty; label: string }[] = [

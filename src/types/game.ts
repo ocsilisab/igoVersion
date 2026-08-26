@@ -4,6 +4,9 @@ export type Player = "black" | "white";
 
 export type BoardSize = 9 | 13 | 19;
 
+/** Every board-size picker in the app offers exactly these three sizes. */
+export const BOARD_SIZES: readonly BoardSize[] = [9, 13, 19];
+
 export type Board = Stone[][];
 
 export interface Position {

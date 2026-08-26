@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { BoardSize, ExtensionRules, TeamRoster } from "../types/game";
+import { BOARD_SIZES, type BoardSize, type ExtensionRules, type TeamRoster } from "../types/game";
 import { DEFAULT_KOMI, MAX_TOTAL_PLAYERS, MIN_TOTAL_PLAYERS, NO_EXTENSIONS } from "../types/game";
 import { splitIntoTeams } from "../utils/teams";
 import KomiSelector from "./KomiSelector";
@@ -13,7 +13,6 @@ interface SoloSetupProps {
   onCancel: () => void;
 }
 
-const BOARD_SIZES: BoardSize[] = [9, 13, 19];
 
 export default function SoloSetup({ onStart, onCancel }: SoloSetupProps) {
   const [boardSize, setBoardSize] = useState<BoardSize>(9);

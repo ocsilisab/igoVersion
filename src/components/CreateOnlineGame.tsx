@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { BoardSize, ExtensionRules, Player, TeamRoster } from "../types/game";
+import { BOARD_SIZES, type BoardSize, type ExtensionRules, type Player, type TeamRoster } from "../types/game";
 import { DEFAULT_KOMI, MIN_TOTAL_PLAYERS, MAX_TOTAL_PLAYERS, NO_EXTENSIONS } from "../types/game";
 import { assignSeatTeams } from "../online/teamAssignment";
 import { createOnlineGame, joinOnlineGame, joinOnlineGameById, OnlineApiError } from "../online/api";
@@ -16,7 +16,6 @@ interface CreateOnlineGameProps {
   onEntered: (gameId: string) => void;
 }
 
-const BOARD_SIZES: BoardSize[] = [9, 13, 19];
 
 export default function CreateOnlineGame({ onCancel, onEntered }: CreateOnlineGameProps) {
   const [boardSize, setBoardSize] = useState<BoardSize>(9);
