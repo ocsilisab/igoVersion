@@ -33,7 +33,15 @@ interface CardGameRow {
   expires_at: string;
 }
 
-function rowToGame(row: CardGameRow): CardGame {
+/**
+ * `viewerGuestId` decides which hand actually goes out in the response: only the
+ * viewer's own, never the opponent's -- host_hand/guest_hand are the tesuji ids still
+ * to be solved, and an id is enough to look up its exact solution client-side
+ * (src/cards/tesujiCards.ts ships in the bundle). A spectator (viewerGuestId matching
+ * neither side, or null) gets both redacted to null.
+ */
+function rowToGame(row: CardGameRow, viewerGuestId: string | null): CardGame {
+  const side = sideOf(row, viewerGuestId ?? "");
   return {
     id: row.id,
     code: row.code,
@@ -41,8 +49,8 @@ function rowToGame(row: CardGameRow): CardGame {
     status: row.status,
     hostName: row.host_name,
     guestName: row.guest_name,
-    hostHand: row.host_hand,
-    guestHand: row.guest_hand,
+    hostHand: side === "host" ? row.host_hand : null,
+    guestHand: side === "guest" ? row.guest_hand : null,
     hostProgress: row.host_progress,
     guestProgress: row.guest_progress,
     hostMistakes: row.host_mistakes,
@@ -91,7 +99,7 @@ export async function createCardGame(hostGuestId: string, hostName: string): Pro
       throw Errors.serverError();
     }
 
-    return rowToGame(data as CardGameRow);
+    return rowToGame(data as CardGameRow, hostGuestId);
   }
 
   throw Errors.serverError();
@@ -102,14 +110,17 @@ export interface FoundCardGame {
   isHost: (guestId: string | null) => boolean;
 }
 
-export async function findCardGameById(id: string): Promise<FoundCardGame | null> {
+export async function findCardGameById(id: string, viewerGuestId: string | null): Promise<FoundCardGame | null> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase.from("card_games").select("*").eq("id", id).maybeSingle();
   if (error) throw Errors.serverError();
   if (!data) return null;
 
   const row = data as CardGameRow;
-  return { game: rowToGame(row), isHost: (guestId) => guestId !== null && guestId === row.host_guest_id };
+  return {
+    game: rowToGame(row, viewerGuestId),
+    isHost: (guestId) => guestId !== null && guestId === row.host_guest_id,
+  };
 }
 
 /**
@@ -125,8 +136,8 @@ export async function joinCardGame(code: string, guestId: string, displayName: s
 
   const row = data as CardGameRow;
 
-  if (row.host_guest_id === guestId) return { game: rowToGame(row), isHost: true };
-  if (row.guest_guest_id === guestId) return { game: rowToGame(row), isHost: false };
+  if (row.host_guest_id === guestId) return { game: rowToGame(row, guestId), isHost: true };
+  if (row.guest_guest_id === guestId) return { game: rowToGame(row, guestId), isHost: false };
 
   if (isExpiredWaiting(row)) throw Errors.expired();
   if (row.status !== "waiting") throw Errors.full();
@@ -149,7 +160,7 @@ export async function joinCardGame(code: string, guestId: string, displayName: s
   // Someone else claimed the guest slot between our read and our write.
   if (!updated) throw Errors.full();
 
-  return { game: rowToGame(updated as CardGameRow), isHost: false };
+  return { game: rowToGame(updated as CardGameRow, guestId), isHost: false };
 }
 
 function drawHand(deckIds: string[]): string[] {
@@ -173,7 +184,7 @@ export async function submitHand(gameId: string, guestId: string, deckIds: strin
   if (!side) throw Errors.wrongColor();
 
   const existingHand = side === "host" ? row.host_hand : row.guest_hand;
-  if (existingHand) return { game: rowToGame(row), isHost: side === "host" };
+  if (existingHand) return { game: rowToGame(row, guestId), isHost: side === "host" };
 
   if (row.status !== "ready" && row.status !== "waiting") throw Errors.badRequest("La partida no está esperando jugadores.");
 
@@ -199,7 +210,7 @@ export async function submitHand(gameId: string, guestId: string, deckIds: strin
   if (error) throw Errors.serverError();
   if (!updated) throw Errors.conflict();
 
-  return { game: rowToGame(updated as CardGameRow), isHost: side === "host" };
+  return { game: rowToGame(updated as CardGameRow, guestId), isHost: side === "host" };
 }
 
 /**
@@ -250,7 +261,7 @@ export async function submitAnswer(gameId: string, guestId: string, row: number,
   if (error) throw Errors.serverError();
   if (!updated) throw Errors.conflict();
 
-  return { game: rowToGame(updated as CardGameRow), isHost: side === "host" };
+  return { game: rowToGame(updated as CardGameRow, guestId), isHost: side === "host" };
 }
 
 /**
@@ -288,5 +299,5 @@ export async function rematchCardGame(gameId: string, guestId: string): Promise<
   if (error) throw Errors.serverError();
   if (!updated) throw Errors.conflict();
 
-  return { game: rowToGame(updated as CardGameRow), isHost: side === "host" };
+  return { game: rowToGame(updated as CardGameRow, guestId), isHost: side === "host" };
 }

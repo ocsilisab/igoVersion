@@ -71,6 +71,7 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
     placeStone,
     pass,
     toggleDeadGroup,
+    confirmScoring,
     finalize,
     leave,
     start,
@@ -357,6 +358,9 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
   const isMyTurn = Boolean(you?.isYourTurn);
   const boardDisabled = game.status !== "playing" || game.isScoring || !isMyTurn;
   const activePlayer = getActivePlayer(game, game.currentPlayer);
+  const myTeamConfirmedScoring = Boolean(you?.team && game.deadStonesConfirmedTeams.includes(you.team));
+  const bothTeamsConfirmedScoring =
+    game.deadStonesConfirmedTeams.includes("black") && game.deadStonesConfirmedTeams.includes("white");
 
   return (
     <div className="game-screen">
@@ -422,9 +426,23 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
       {game.status !== "finished" && (
         <div className="game-controls">
           {game.isScoring ? (
-            <button className="btn btn-primary" onClick={() => void finalize()}>
-              Finalizar partida
-            </button>
+            <>
+              <button
+                className="btn btn-secondary"
+                onClick={() => void confirmScoring()}
+                disabled={myTeamConfirmedScoring}
+              >
+                {myTeamConfirmedScoring ? "Marcador confirmado ✓" : "Confirmar marcador"}
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => void finalize()}
+                disabled={!bothTeamsConfirmedScoring}
+                title={bothTeamsConfirmedScoring ? undefined : "Los dos equipos deben confirmar el marcador primero"}
+              >
+                Finalizar partida
+              </button>
+            </>
           ) : (
             <button className="btn btn-primary" onClick={() => void pass()} disabled={!isMyTurn}>
               Pasar
@@ -434,6 +452,14 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
             Abandonar partida
           </button>
         </div>
+      )}
+
+      {game.isScoring && (
+        <p className="online-waiting">
+          {bothTeamsConfirmedScoring
+            ? "Ambos equipos han confirmado el marcador."
+            : "Marca las piedras muertas y confirma el marcador — si alguien marca o desmarca algo, hay que volver a confirmar."}
+        </p>
       )}
 
       {confirmLeave && (

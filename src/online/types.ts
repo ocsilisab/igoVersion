@@ -61,6 +61,10 @@ export interface OnlineGame {
   history: string[];
   isScoring: boolean;
   deadStones: string[];
+  /** Teams that have confirmed the *current* deadStones as correct -- reset whenever
+   * deadStones itself changes. finalize.ts refuses to close the game until both
+   * "black" and "white" are present here (see mark-dead.ts's "confirm" action). */
+  deadStonesConfirmedTeams: Player[];
   lastMove: { row: number; col: number } | null;
 
   extensions: ExtensionRules;

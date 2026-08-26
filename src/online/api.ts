@@ -98,7 +98,16 @@ export function sendPass(id: string): Promise<GameMutationResponse> {
 export function sendMarkDead(id: string, row: number, col: number): Promise<GameMutationResponse> {
   return request<GameMutationResponse>(`/api/games/${id}/mark-dead`, {
     method: "POST",
-    body: JSON.stringify({ row, col }),
+    body: JSON.stringify({ action: "toggle", row, col }),
+  });
+}
+
+/** Signs off, for the caller's own team, on the dead stones exactly as they stand right
+ * now -- see mark-dead.ts. The other team still has to confirm separately. */
+export function sendConfirmScoring(id: string): Promise<GameMutationResponse> {
+  return request<GameMutationResponse>(`/api/games/${id}/mark-dead`, {
+    method: "POST",
+    body: JSON.stringify({ action: "confirm" }),
   });
 }
 

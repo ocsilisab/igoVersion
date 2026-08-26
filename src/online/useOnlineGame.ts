@@ -7,6 +7,7 @@ import {
   fetchOnlineGame,
   joinOnlineGameById,
   joinOnlineGameByToken,
+  sendConfirmScoring,
   sendFinalize,
   sendLeave,
   sendMarkDead,
@@ -36,6 +37,8 @@ export interface UseOnlineGameResult {
   placeStone: (row: number, col: number) => Promise<void>;
   pass: () => Promise<void>;
   toggleDeadGroup: (row: number, col: number) => Promise<void>;
+  /** Signs off, for your own team, on the dead stones exactly as they stand right now. */
+  confirmScoring: () => Promise<void>;
   finalize: () => Promise<void>;
   leave: () => Promise<void>;
   start: () => Promise<void>;
@@ -175,6 +178,11 @@ export function useOnlineGame(gameId: string, initial?: { game: OnlineGame; you:
     [game, runAction]
   );
 
+  const confirmScoring = useCallback(() => {
+    if (!game) return Promise.resolve();
+    return runAction(() => sendConfirmScoring(game.id));
+  }, [game, runAction]);
+
   const finalize = useCallback(() => {
     if (!game) return Promise.resolve();
     return runAction(() => sendFinalize(game.id));
@@ -221,6 +229,7 @@ export function useOnlineGame(gameId: string, initial?: { game: OnlineGame; you:
     placeStone,
     pass,
     toggleDeadGroup,
+    confirmScoring,
     finalize,
     leave,
     start,

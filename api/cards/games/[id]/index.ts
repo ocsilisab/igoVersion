@@ -26,9 +26,9 @@ export default withHandler(["GET", "POST"], async (req: VercelRequest, res: Verc
   if (typeof id !== "string") throw Errors.badRequest("Falta el id de la partida.");
 
   if (req.method === "GET") {
-    const found = await findCardGameById(id);
-    if (!found) throw Errors.notFound();
     const guestId = readGuestId(req);
+    const found = await findCardGameById(id, guestId);
+    if (!found) throw Errors.notFound();
     res.status(200).json({ game: found.game, isHost: found.isHost(guestId) });
     return;
   }

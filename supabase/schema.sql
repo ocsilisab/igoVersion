@@ -43,6 +43,12 @@ create table if not exists games (
   is_scoring boolean not null default false,
   -- Array of "row,col" posKeys currently marked dead during the scoring phase.
   dead_stones jsonb not null default '[]'::jsonb,
+  -- Which teams ('black'/'white') have confirmed the *current* dead_stones as correct.
+  -- Reset to '[]' every time dead_stones itself changes (see mark-dead.ts) -- finalize.ts
+  -- requires both teams present here before it will accept a result, so one player can
+  -- no longer mark the opponent's live groups dead and immediately lock in the score
+  -- before the opponent gets a chance to object.
+  dead_stones_confirmed_teams jsonb not null default '[]'::jsonb,
   last_move jsonb,
 
   -- Optional house rules chosen at setup — see src/utils/extensions.ts. move_count and
@@ -83,6 +89,7 @@ alter table games add column if not exists extension_bombs boolean not null defa
 alter table games add column if not exists extension_stars boolean not null default false;
 alter table games add column if not exists move_count integer not null default 0;
 alter table games add column if not exists last_bomb jsonb;
+alter table games add column if not exists dead_stones_confirmed_teams jsonb not null default '[]'::jsonb;
 
 create unique index if not exists games_code_key on games (code);
 create index if not exists games_status_idx on games (status);
@@ -252,12 +259,19 @@ create index if not exists card_games_status_idx on card_games (status);
 
 alter table card_games enable row level security;
 
+-- Unlike `games`, this table is NOT publicly readable: host_hand/guest_hand hold the
+-- other side's still-unsolved tesuji ids, and knowing an id is enough to look up its
+-- exact solution in src/cards/tesujiCards.ts (shipped in the client bundle). A public
+-- "using (true)" policy here -- even though the API itself already redacts the
+-- opponent's hand in every response (see cardGameRepo.ts::rowToGame) -- would still let
+-- anyone with the anon key query this table directly and read both hands raw. Only the
+-- service role (the /api routes, which bypasses RLS entirely) can read or write.
+-- The one visible cost: the browser's Supabase Realtime subscription on this table (see
+-- useCardGame.ts) can no longer receive change events without a matching read policy,
+-- so card games rely on the existing polling fallback (~3-4s) instead of instant
+-- Realtime updates -- the same fallback already used when Realtime isn't configured at
+-- all, not a new code path.
 drop policy if exists "Public read access" on card_games;
-create policy "Public read access" on card_games
-  for select
-  using (true);
-
--- Same reasoning as games: only the service role (the /api routes) can write.
 
 do $$
 begin

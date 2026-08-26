@@ -7,7 +7,13 @@ import { Errors } from "../../_lib/errors.js";
 import { readGuestId } from "../../_lib/session.js";
 import { loadPlayableGame, applyGameUpdate } from "../../_lib/gameRepo.js";
 
-/** Either player can confirm the final score once dead stones are marked. */
+/**
+ * Either player can *call* this, but it only succeeds once both teams have confirmed the
+ * current dead_stones (see mark-dead.ts's "confirm" action) -- otherwise one player could
+ * mark the opponent's live groups dead and lock in the score before the opponent gets a
+ * chance to object or re-mark anything. This is the one check that actually enforces
+ * mutual agreement; the confirmation itself is just data until this route reads it.
+ */
 export default withHandler(["POST"], async (req: VercelRequest, res: VercelResponse) => {
   const allowed = await checkRateLimit(req, { action: "finalize", limit: 20, windowSeconds: 60 });
   if (!allowed) throw Errors.rateLimited();
@@ -19,6 +25,12 @@ export default withHandler(["POST"], async (req: VercelRequest, res: VercelRespo
   const { game } = await loadPlayableGame(id, guestId);
 
   if (!game.isScoring) throw Errors.invalidMove("La partida no está en fase de puntuación.");
+
+  const confirmedByBoth =
+    game.deadStonesConfirmedTeams.includes("black") && game.deadStonesConfirmedTeams.includes("white");
+  if (!confirmedByBoth) {
+    throw Errors.badRequest("Ambos equipos deben confirmar qué piedras están muertas antes de finalizar.");
+  }
 
   // Dead stones are only removed for the *score calculation* — the stored board keeps
   // showing them (still crossed out via dead_stones) so the final board stays reviewable

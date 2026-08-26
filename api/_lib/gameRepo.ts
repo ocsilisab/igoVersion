@@ -28,6 +28,7 @@ interface GameRow {
   history: string[];
   is_scoring: boolean;
   dead_stones: string[];
+  dead_stones_confirmed_teams: Player[];
   last_move: { row: number; col: number } | null;
   extension_bombs: boolean;
   extension_stars: boolean;
@@ -85,6 +86,7 @@ function rowToGame(row: GameRow, playerRows: PlayerRow[]): OnlineGame {
     history: row.history,
     isScoring: row.is_scoring,
     deadStones: row.dead_stones,
+    deadStonesConfirmedTeams: row.dead_stones_confirmed_teams ?? [],
     lastMove: row.last_move,
     extensions: { bombs: row.extension_bombs, stars: row.extension_stars },
     moveCount: row.move_count,
