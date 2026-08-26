@@ -68,17 +68,26 @@ export function useOnlineGame(gameId: string, initial?: { game: OnlineGame; you:
   const youRef = useRef(you);
   youRef.current = you;
   const channelRef = useRef<RealtimeChannel | null>(null);
+  // Kept in sync every render (not just when refresh() is recreated) so an in-flight
+  // fetch for a stale gameId can tell it's stale by the time it resolves -- see below.
+  const gameIdRef = useRef(gameId);
+  gameIdRef.current = gameId;
 
   const refresh = useCallback(async () => {
+    const requestedId = gameId;
     try {
-      const res = await fetchOnlineGame(gameId);
+      const res = await fetchOnlineGame(requestedId);
+      // gameId changed (e.g. onRematch/onJoinAnother) while this request was in flight --
+      // applying it now would overwrite the new game with the old one's data.
+      if (gameIdRef.current !== requestedId) return;
       setGame(res.game);
       setYou(res.you);
       setLoadError(null);
     } catch (err) {
+      if (gameIdRef.current !== requestedId) return;
       setLoadError(err instanceof OnlineApiError ? err.message : "No se ha podido cargar la partida.");
     } finally {
-      setLoading(false);
+      if (gameIdRef.current === requestedId) setLoading(false);
     }
   }, [gameId]);
 
