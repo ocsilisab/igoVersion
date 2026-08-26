@@ -390,8 +390,11 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
       />
 
       {actionError && (
-        <p className="error-banner" onClick={clearActionError}>
+        <p className="error-banner error-banner-dismissible">
           {actionError}
+          <button type="button" className="error-banner-dismiss" onClick={clearActionError} aria-label="Cerrar aviso">
+            ✕
+          </button>
         </p>
       )}
       {game.lastBomb && game.status !== "finished" && (

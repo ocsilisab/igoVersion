@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useCardGame } from "../hooks/useCardGame";
+import { useClipboardCopy } from "../hooks/useClipboardCopy";
 import { getOrCreateCollection, getSavedDeck } from "../cards/collection";
 import CardsMatch from "./CardsMatch";
 import "./GameSetup.css";
@@ -21,7 +22,7 @@ function myDeckIds(): string[] {
 export default function CardsPlay({ onBack }: CardsPlayProps) {
   const { game, isHost, loading, error, joinByCode, submitHand, submitAnswer, rematch, clearError } = useCardGame();
   const [codeInput, setCodeInput] = useState("");
-  const [copied, setCopied] = useState(false);
+  const { copiedKey, copy } = useClipboardCopy();
   const [joining, setJoining] = useState(false);
   // Guards against re-submitting a hand while the first submission is still in flight
   // (game.hostHand/guestHand is still null then too). Cleared on 'finished' so a rematch
@@ -43,13 +44,7 @@ export default function CardsPlay({ onBack }: CardsPlayProps) {
 
   const handleCopyCode = async () => {
     if (!game) return;
-    try {
-      await navigator.clipboard.writeText(game.code);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard permission denied/unavailable — the code is still visible on screen.
-    }
+    await copy(game.code, "code");
   };
 
   const handleJoin = async () => {
@@ -95,7 +90,7 @@ export default function CardsPlay({ onBack }: CardsPlayProps) {
               <span className="online-code-value">{game.code}</span>
               <div className="online-code-actions">
                 <button className="btn btn-secondary" onClick={() => void handleCopyCode()}>
-                  {copied ? "¡Copiado!" : "Copiar código"}
+                  {copiedKey === "code" ? "¡Copiado!" : "Copiar código"}
                 </button>
               </div>
             </div>
@@ -110,6 +105,7 @@ export default function CardsPlay({ onBack }: CardsPlayProps) {
               value={codeInput}
               onChange={(e) => setCodeInput(e.target.value)}
               placeholder="Código del rival"
+              aria-label="Código del rival"
               maxLength={6}
               disabled={joining}
             />

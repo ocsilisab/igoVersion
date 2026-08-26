@@ -132,6 +132,11 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
               );
             })}
           </div>
+          <p className="setup-hint">
+            <strong>Fácil</strong>: reacciona a la jugada actual, sin planificar por delante. <strong>Difícil</strong>:
+            explora varias jugadas futuras antes de decidir. <strong>Experta</strong>: red neuronal entrenada con
+            partidas de jugadores profesionales.
+          </p>
           {difficulty === "experta" && expertaStatus === "available" && !nativeBoardSizes.includes(boardSize) && (
             <p className="setup-hint">
               En {boardSize}×{boardSize} "Experta" usa el modelo de 19×19 adaptado a un tablero más pequeño — juega

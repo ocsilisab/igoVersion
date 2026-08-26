@@ -36,8 +36,8 @@ export default function CardsMenu({ onPlay, onChooseDeck, onBuy, onCancel }: Car
           <button className="home-btn" onClick={onChooseDeck}>
             Elegir baraja
           </button>
-          <button className="home-btn" onClick={onBuy}>
-            Comprar
+          <button className="home-btn home-btn-disabled" onClick={onBuy} disabled title="Todavía no disponible">
+            Comprar (próximamente)
           </button>
         </div>
       </div>
