@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { BOARD_SIZES, type AiDifficulty, type BoardSize, type ExtensionRules, type Player } from "../types/game";
 import { DEFAULT_AI_DIFFICULTY, DEFAULT_KOMI, MAX_TOTAL_PLAYERS, NO_EXTENSIONS } from "../types/game";
+import type { TimeControl } from "../utils/clock";
 import { checkNeuralServiceHealth } from "../ai/neural/chooseNeuralMove";
 import KomiSelector from "./KomiSelector";
 import PlayerRoster from "./PlayerRoster";
 import ExtensionsSelector from "./ExtensionsSelector";
+import TimeControlSelector from "./TimeControlSelector";
 import "./GameSetup.css";
 
 interface GameSetupProps {
@@ -14,7 +16,8 @@ interface GameSetupProps {
     komi: number,
     humanNames: string[],
     extensions: ExtensionRules,
-    difficulty: AiDifficulty
+    difficulty: AiDifficulty,
+    timeControl: TimeControl | null
   ) => void;
   onCancel: () => void;
 }
@@ -34,6 +37,7 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
   const [humanNames, setHumanNames] = useState<string[]>(["Jugador 1"]);
   const [extensions, setExtensions] = useState<ExtensionRules>(NO_EXTENSIONS);
   const [difficulty, setDifficulty] = useState<AiDifficulty>(DEFAULT_AI_DIFFICULTY);
+  const [timeControl, setTimeControl] = useState<TimeControl | null>(null);
   const [expertaStatus, setExpertaStatus] = useState<"checking" | "available" | "unavailable">("checking");
   const [nativeBoardSizes, setNativeBoardSizes] = useState<readonly BoardSize[]>([]);
   const [expertaCheckAttempt, setExpertaCheckAttempt] = useState(0);
@@ -163,9 +167,11 @@ export default function GameSetup({ onStart, onCancel }: GameSetupProps) {
 
         <ExtensionsSelector extensions={extensions} onChange={setExtensions} />
 
+        <TimeControlSelector value={timeControl} onChange={setTimeControl} />
+
         <button
           className="btn btn-primary setup-start"
-          onClick={() => onStart(boardSize, playerColor, komi, humanNames, extensions, difficulty)}
+          onClick={() => onStart(boardSize, playerColor, komi, humanNames, extensions, difficulty, timeControl)}
         >
           Empezar partida
         </button>

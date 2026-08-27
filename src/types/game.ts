@@ -1,3 +1,5 @@
+import type { ClockState, TimeControl } from "../utils/clock.js";
+
 export type Stone = "black" | "white" | null;
 
 export type Player = "black" | "white";
@@ -90,6 +92,15 @@ export interface GameState {
   recentMoves: (Position | null)[];
   winner: Player | "draw" | null;
   score: ScoreResult | null;
+  /** null = untimed game (default, unchanged behavior). */
+  timeControl: TimeControl | null;
+  /** Only non-null when `timeControl` is set. A color missing from this object has no
+   * clock at all and can never run out of time -- e.g. the AI's side in an AI game, see
+   * useAiGoGame.ts. */
+  clocks: Partial<Record<Player, ClockState>> | null;
+  /** Set once the game ends: "score" via the normal pass-pass-finalize flow, "timeout" when
+   * a clock ran out (see useClockTicker.ts). null while the game is still going. */
+  winReason: "score" | "timeout" | null;
 }
 
 /** Reserved for future modes (AI / online) so the UI can branch without changing core game logic. */

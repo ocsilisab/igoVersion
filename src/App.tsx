@@ -11,6 +11,7 @@ import DeckBuilder from "./components/DeckBuilder";
 import CardsPlay from "./components/CardsPlay";
 import { hasSavedDeck } from "./cards/collection";
 import type { AiDifficulty, BoardSize, ExtensionRules, Player, TeamRoster } from "./types/game";
+import type { TimeControl } from "./utils/clock";
 import "./App.css";
 
 type Screen =
@@ -30,6 +31,7 @@ interface SoloConfig {
   komi: number;
   teams: TeamRoster;
   extensions: ExtensionRules;
+  timeControl: TimeControl | null;
 }
 
 interface AiConfig {
@@ -39,6 +41,7 @@ interface AiConfig {
   humanNames: string[];
   extensions: ExtensionRules;
   difficulty: AiDifficulty;
+  timeControl: TimeControl | null;
 }
 
 /**
@@ -105,8 +108,8 @@ export default function App() {
     return (
       <SoloSetup
         onCancel={() => setScreen("home")}
-        onStart={(boardSize, komi, teams, extensions) => {
-          setSoloConfig({ boardSize, komi, teams, extensions });
+        onStart={(boardSize, komi, teams, extensions, timeControl) => {
+          setSoloConfig({ boardSize, komi, teams, extensions, timeControl });
           setScreen("solo-game");
         }}
       />
@@ -120,6 +123,7 @@ export default function App() {
         komi={soloConfig.komi}
         teams={soloConfig.teams}
         extensions={soloConfig.extensions}
+        timeControl={soloConfig.timeControl}
         onExit={() => setScreen("home")}
       />
     );
@@ -129,8 +133,8 @@ export default function App() {
     return (
       <GameSetup
         onCancel={() => setScreen("home")}
-        onStart={(boardSize, playerColor, komi, humanNames, extensions, difficulty) => {
-          setAiConfig({ boardSize, playerColor, komi, humanNames, extensions, difficulty });
+        onStart={(boardSize, playerColor, komi, humanNames, extensions, difficulty, timeControl) => {
+          setAiConfig({ boardSize, playerColor, komi, humanNames, extensions, difficulty, timeControl });
           setScreen("ai-game");
         }}
       />
@@ -146,6 +150,7 @@ export default function App() {
         humanNames={aiConfig.humanNames}
         extensions={aiConfig.extensions}
         difficulty={aiConfig.difficulty}
+        timeControl={aiConfig.timeControl}
         onExit={() => setScreen("home")}
       />
     );

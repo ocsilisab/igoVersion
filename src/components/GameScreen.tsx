@@ -2,9 +2,11 @@ import { useState } from "react";
 import { useGoGame } from "../hooks/useGoGame";
 import type { BoardSize, ExtensionRules, TeamRoster } from "../types/game";
 import { NO_EXTENSIONS } from "../types/game";
+import type { TimeControl } from "../utils/clock";
 import GoBoard from "./GoBoard";
 import GameInfo from "./GameInfo";
 import GameControls from "./GameControls";
+import ClockDisplay from "./ClockDisplay";
 import ConfirmModal from "./ConfirmModal";
 import GameOverModal from "./GameOverModal";
 import "./GameScreen.css";
@@ -14,12 +16,30 @@ interface GameScreenProps {
   komi: number;
   teams: TeamRoster;
   extensions?: ExtensionRules;
+  timeControl?: TimeControl | null;
   onExit: () => void;
 }
 
-export default function GameScreen({ boardSize, komi, teams, extensions = NO_EXTENSIONS, onExit }: GameScreenProps) {
-  const { state, lastError, scoringPreview, activePlayerName, placeStone, pass, toggleDeadGroup, finalizeScoring, resetGame } =
-    useGoGame(boardSize, komi, teams, extensions);
+export default function GameScreen({
+  boardSize,
+  komi,
+  teams,
+  extensions = NO_EXTENSIONS,
+  timeControl = null,
+  onExit,
+}: GameScreenProps) {
+  const {
+    state,
+    lastError,
+    scoringPreview,
+    activePlayerName,
+    liveClocks,
+    placeStone,
+    pass,
+    toggleDeadGroup,
+    finalizeScoring,
+    resetGame,
+  } = useGoGame(boardSize, komi, teams, extensions, timeControl);
   const [confirmReset, setConfirmReset] = useState(false);
 
   const confirmResetGame = () => {
@@ -38,6 +58,15 @@ export default function GameScreen({ boardSize, komi, teams, extensions = NO_EXT
           {state.boardSize} × {state.boardSize} · Komi {state.komi}
         </span>
       </header>
+
+      {liveClocks && state.timeControl && (
+        <ClockDisplay
+          clocks={liveClocks}
+          style={state.timeControl.style}
+          currentPlayer={state.currentPlayer}
+          gameOver={state.gameOver}
+        />
+      )}
 
       <GameInfo
         currentPlayer={state.currentPlayer}
@@ -89,8 +118,14 @@ export default function GameScreen({ boardSize, komi, teams, extensions = NO_EXT
         />
       )}
 
-      {state.gameOver && state.score && (
-        <GameOverModal score={state.score} onPlayAgain={() => resetGame()} onExit={onExit} />
+      {state.gameOver && (
+        <GameOverModal
+          score={state.score}
+          winner={state.winner}
+          winReason={state.winReason ?? "score"}
+          onPlayAgain={() => resetGame()}
+          onExit={onExit}
+        />
       )}
     </div>
   );

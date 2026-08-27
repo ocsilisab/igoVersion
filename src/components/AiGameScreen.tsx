@@ -2,9 +2,11 @@ import { useState } from "react";
 import { useAiGoGame } from "../hooks/useAiGoGame";
 import type { AiDifficulty, BoardSize, ExtensionRules, Player } from "../types/game";
 import { DEFAULT_AI_DIFFICULTY, NO_EXTENSIONS } from "../types/game";
+import type { TimeControl } from "../utils/clock";
 import GoBoard from "./GoBoard";
 import GameInfo from "./GameInfo";
 import GameControls from "./GameControls";
+import ClockDisplay from "./ClockDisplay";
 import ConfirmModal from "./ConfirmModal";
 import GameOverModal from "./GameOverModal";
 import "./GameScreen.css";
@@ -22,6 +24,7 @@ interface AiGameScreenProps {
   humanNames: string[];
   extensions?: ExtensionRules;
   difficulty?: AiDifficulty;
+  timeControl?: TimeControl | null;
   onExit: () => void;
 }
 
@@ -32,6 +35,7 @@ export default function AiGameScreen({
   humanNames,
   extensions = NO_EXTENSIONS,
   difficulty = DEFAULT_AI_DIFFICULTY,
+  timeControl = null,
   onExit,
 }: AiGameScreenProps) {
   const aiColor: Player = playerColor === "black" ? "white" : "black";
@@ -41,12 +45,13 @@ export default function AiGameScreen({
     isAiThinking,
     scoringPreview,
     activePlayerName,
+    liveClocks,
     placeStone,
     pass,
     toggleDeadGroup,
     finalizeScoring,
     resetGame,
-  } = useAiGoGame(boardSize, aiColor, komi, humanNames, extensions, difficulty);
+  } = useAiGoGame(boardSize, aiColor, komi, humanNames, extensions, difficulty, timeControl);
   const [confirmReset, setConfirmReset] = useState(false);
 
   const isPlayerTurn = !state.gameOver && !state.isScoring && !isAiThinking && state.currentPlayer === playerColor;
@@ -67,6 +72,15 @@ export default function AiGameScreen({
           {state.boardSize} × {state.boardSize} · Komi {state.komi}
         </span>
       </header>
+
+      {liveClocks && state.timeControl && (
+        <ClockDisplay
+          clocks={liveClocks}
+          style={state.timeControl.style}
+          currentPlayer={state.currentPlayer}
+          gameOver={state.gameOver}
+        />
+      )}
 
       <GameInfo
         currentPlayer={state.currentPlayer}
@@ -121,8 +135,14 @@ export default function AiGameScreen({
         />
       )}
 
-      {state.gameOver && state.score && (
-        <GameOverModal score={state.score} onPlayAgain={() => resetGame()} onExit={onExit} />
+      {state.gameOver && (
+        <GameOverModal
+          score={state.score}
+          winner={state.winner}
+          winReason={state.winReason ?? "score"}
+          onPlayAgain={() => resetGame()}
+          onExit={onExit}
+        />
       )}
     </div>
   );

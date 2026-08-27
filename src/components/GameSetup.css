@@ -107,6 +107,25 @@
   text-transform: uppercase;
 }
 
+.setup-input-narrow {
+  width: 90px;
+}
+
+.time-control-custom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.time-control-custom label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
 .setup-start {
   width: 100%;
   font-size: 1.1rem;

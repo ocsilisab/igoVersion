@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { AiDifficulty, BoardSize, ExtensionRules, Player, Position, TeamRoster } from "../types/game";
 import { DEFAULT_AI_DIFFICULTY, NO_EXTENSIONS } from "../types/game";
+import { opponent } from "../utils/board";
+import type { TimeControl } from "../utils/clock";
 import { useGoGame } from "./useGoGame";
 import { useMctsWorker } from "./useMctsWorker";
 import { chooseAiMove } from "../ai/chooseMove";
@@ -31,10 +33,13 @@ export function useAiGoGame(
   initialKomi: number,
   humanNames: string[],
   initialExtensions: ExtensionRules = NO_EXTENSIONS,
-  difficulty: AiDifficulty = DEFAULT_AI_DIFFICULTY
+  difficulty: AiDifficulty = DEFAULT_AI_DIFFICULTY,
+  timeControl: TimeControl | null = null
 ) {
   const teams: TeamRoster = aiColor === "black" ? { black: AI_ROSTER, white: humanNames } : { black: humanNames, white: AI_ROSTER };
-  const game = useGoGame(initialSize, initialKomi, teams, initialExtensions);
+  // Only the human's side ever gets a clock -- the AI never consumes time or times out,
+  // regardless of how long "Dificil"/"Experta" actually take to pick a move.
+  const game = useGoGame(initialSize, initialKomi, teams, initialExtensions, timeControl, [opponent(aiColor)]);
   const { state, placeStone, pass } = game;
   const [isAiThinking, setIsAiThinking] = useState(false);
   const isThinkingRef = useRef(false);

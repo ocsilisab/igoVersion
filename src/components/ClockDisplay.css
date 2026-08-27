@@ -1,0 +1,32 @@
+.clock-display {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  gap: 8px;
+}
+
+.clock-item {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.clock-item-active {
+  border-color: var(--accent);
+}
+
+.clock-item-low {
+  color: var(--danger);
+}
+
+.clock-value {
+  font-size: 1.05rem;
+}

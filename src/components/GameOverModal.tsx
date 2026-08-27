@@ -1,7 +1,12 @@
-import type { ScoreResult } from "../types/game";
+import type { Player, ScoreResult } from "../types/game";
 
 interface GameOverModalProps {
-  score: ScoreResult;
+  /** Absent for a timeout ending -- there's no ScoreResult since the game never reached
+   * finalizeScoring. */
+  score?: ScoreResult | null;
+  /** Only meaningful (and required) when `score` is absent. */
+  winner?: Player | "draw" | null;
+  winReason?: "score" | "timeout";
   onPlayAgain: () => void;
   onExit: () => void;
   /** Overrides the "Jugar de nuevo" button text -- e.g. online games show progress while the rematch is being created. */
@@ -9,9 +14,9 @@ interface GameOverModalProps {
   playAgainDisabled?: boolean;
 }
 
-function winnerLabel(score: ScoreResult): string {
-  if (score.winner === "draw") return "Empate";
-  return score.winner === "black" ? "Ganan las Negras" : "Ganan las Blancas";
+function winnerLabel(winner: Player | "draw" | null | undefined): string {
+  if (winner === "draw") return "Empate";
+  return winner === "black" ? "Ganan las Negras" : "Ganan las Blancas";
 }
 
 /**
@@ -20,15 +25,37 @@ function winnerLabel(score: ScoreResult): string {
  */
 export default function GameOverModal({
   score,
+  winner,
+  winReason = "score",
   onPlayAgain,
   onExit,
   playAgainLabel = "Jugar de nuevo",
   playAgainDisabled = false,
 }: GameOverModalProps) {
+  const resolvedWinner = score ? score.winner : winner;
+
+  if (winReason === "timeout" || !score) {
+    return (
+      <div className="game-over-panel" role="region" aria-labelledby="game-over-title">
+        <h2 id="game-over-title">Partida finalizada</h2>
+        <p className="winner-label">{winnerLabel(resolvedWinner)} — por tiempo</p>
+
+        <div className="modal-actions">
+          <button className="btn btn-secondary" onClick={onExit}>
+            Volver al inicio
+          </button>
+          <button className="btn btn-primary" onClick={onPlayAgain} disabled={playAgainDisabled}>
+            {playAgainLabel}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="game-over-panel" role="region" aria-labelledby="game-over-title">
       <h2 id="game-over-title">Partida finalizada</h2>
-      <p className="winner-label">{winnerLabel(score)}</p>
+      <p className="winner-label">{winnerLabel(resolvedWinner)}</p>
 
       <table className="score-table">
         <thead>
