@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import type { BoardSize, Player } from "../../src/types/game.js";
 import { BOARD_SIZES, KOMI_OPTIONS, MIN_TOTAL_PLAYERS, MAX_TOTAL_PLAYERS } from "../../src/types/game.js";
+import { isValidTimeControl, type TimeControl } from "../../src/utils/clock.js";
 import { buildGameResponse } from "../../src/online/turns.js";
 import { withHandler, readBody } from "../_lib/http.js";
 import { checkRateLimit } from "../_lib/rateLimit.js";
@@ -16,6 +17,7 @@ interface CreateGameBody {
   displayName?: string;
   extensionBombs?: boolean;
   extensionStars?: boolean;
+  timeControl?: unknown;
 }
 
 export default withHandler(["GET", "POST"], async (req: VercelRequest, res: VercelResponse) => {
@@ -48,6 +50,11 @@ export default withHandler(["GET", "POST"], async (req: VercelRequest, res: Verc
   if (body.creatorColor !== "black" && body.creatorColor !== "white") {
     throw Errors.badRequest("Color no válido.");
   }
+  let timeControl: TimeControl | null = null;
+  if (body.timeControl !== undefined && body.timeControl !== null) {
+    if (!isValidTimeControl(body.timeControl)) throw Errors.badRequest("Control de tiempo no válido.");
+    timeControl = body.timeControl;
+  }
 
   const displayName = sanitizeDisplayName(body.displayName) ?? defaultGuestName(guestId);
   const game = await createGame({
@@ -58,6 +65,7 @@ export default withHandler(["GET", "POST"], async (req: VercelRequest, res: Verc
     guestId,
     displayName,
     extensions: { bombs: body.extensionBombs === true, stars: body.extensionStars === true },
+    timeControl,
   });
 
   res.status(201).json(buildGameResponse(game, guestId));

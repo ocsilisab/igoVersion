@@ -5,9 +5,12 @@ import { activeRoster, getActivePlayer, rosterNames } from "../online/turns";
 import { createOnlineGame, joinOnlineGameById, OnlineApiError } from "../online/api";
 import { useOpenGames } from "../online/useOpenGames";
 import type { OnlinePlayer, PendingSeat } from "../online/types";
+import type { Player } from "../types/game";
 import { calculateScore, removeDeadStones } from "../utils/scoring";
+import { tickClock, type ClockState } from "../utils/clock";
 import GoBoard from "./GoBoard";
 import GameInfo from "./GameInfo";
+import ClockDisplay from "./ClockDisplay";
 import OpenGamesPanel from "./OpenGamesPanel";
 import ConfirmModal from "./ConfirmModal";
 import GameOverModal from "./GameOverModal";
@@ -116,6 +119,35 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
     );
   }, [game]);
 
+  // Forces a re-render a few times a second so the clock display advances smoothly between
+  // the 4s polls/Realtime pushes -- purely cosmetic, the server is what actually decides
+  // when a clock has run out (see api/_lib/gameRepo.ts::resolveGameClock).
+  const [, forceClockTick] = useState(0);
+  useEffect(() => {
+    if (!game || game.status !== "playing" || !game.timeControl || game.isScoring) return;
+    const interval = window.setInterval(() => forceClockTick((n) => n + 1), 500);
+    return () => window.clearInterval(interval);
+  }, [game]);
+
+  const liveClocks: Partial<Record<Player, ClockState>> | null = useMemo(() => {
+    if (!game || !game.timeControl) return null;
+    const clocks: Partial<Record<Player, ClockState>> = {};
+    if (game.blackClock) clocks.black = game.blackClock;
+    if (game.whiteClock) clocks.white = game.whiteClock;
+    if (game.status === "playing" && !game.isScoring && game.turnStartedAt) {
+      const active = game.currentPlayer;
+      const clock = clocks[active];
+      if (clock) {
+        const elapsed = Date.now() - new Date(game.turnStartedAt).getTime();
+        clocks[active] = tickClock(clock, elapsed, game.timeControl, false).clock;
+      }
+    }
+    return clocks;
+    // Deliberately excludes Date.now() (not a dependency) -- recomputed every render, which
+    // forceClockTick above ensures happens twice a second while a clock is running.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game]);
+
   if (loading) {
     return (
       <div className="online-status-screen">
@@ -164,6 +196,7 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
         game.komi,
         you?.team ?? "black",
         game.extensions,
+        game.timeControl,
         you?.displayName
       );
       onRematch(newGame.id);
@@ -376,6 +409,15 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
           ))}
       </div>
 
+      {liveClocks && game.timeControl && (
+        <ClockDisplay
+          clocks={liveClocks}
+          style={game.timeControl.style}
+          currentPlayer={game.currentPlayer}
+          gameOver={game.status === "finished"}
+        />
+      )}
+
       <GameInfo
         currentPlayer={game.currentPlayer}
         blackCaptures={game.blackCaptures}
@@ -463,10 +505,12 @@ export default function OnlineGameScreen({ gameId, inviteToken, onExit, onRematc
         />
       )}
 
-      {game.status === "finished" && game.score && (
+      {game.status === "finished" && (
         <>
           <GameOverModal
             score={game.score}
+            winner={game.winner}
+            winReason={game.winReason ?? "score"}
             onPlayAgain={() => void handleRematch()}
             onExit={onExit}
             playAgainLabel={rematching ? "Creando revancha…" : "Jugar de nuevo"}

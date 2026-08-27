@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { Board, BoardSize, ExtensionRules, Player } from "../../src/types/game.js";
-import { createEmptyBoard, serializeBoard } from "../../src/utils/board.js";
+import { createEmptyBoard, opponent, serializeBoard } from "../../src/utils/board.js";
+import { createInitialClock, tickClock, type ClockState, type TimeControl } from "../../src/utils/clock.js";
 import type { OnlineGame, OnlineGameStatus, OnlinePlayer, OpenGameSummary, PendingSeat } from "../../src/online/types.js";
 import { getActivePlayer } from "../../src/online/turns.js";
 import { assignSeatTeams } from "../../src/online/teamAssignment.js";
@@ -36,8 +37,13 @@ interface GameRow {
   last_bomb: OnlineGame["lastBomb"];
   status: OnlineGameStatus;
   winner: OnlineGame["winner"];
+  win_reason: OnlineGame["winReason"];
   score: OnlineGame["score"];
   abandoned_team: Player | null;
+  time_control: TimeControl | null;
+  black_clock: ClockState | null;
+  white_clock: ClockState | null;
+  turn_started_at: string | null;
   created_at: string;
   updated_at: string;
   expires_at: string;
@@ -93,8 +99,13 @@ function rowToGame(row: GameRow, playerRows: PlayerRow[]): OnlineGame {
     lastBomb: row.last_bomb,
     status: row.status,
     winner: row.winner,
+    winReason: row.win_reason,
     score: row.score,
     abandonedTeam: row.abandoned_team,
+    timeControl: row.time_control,
+    blackClock: row.black_clock,
+    whiteClock: row.white_clock,
+    turnStartedAt: row.turn_started_at,
     players,
     pendingSeats,
     createdAt: row.created_at,
@@ -114,12 +125,49 @@ async function fetchPlayers(gameId: string): Promise<PlayerRow[]> {
   return (data ?? []) as PlayerRow[];
 }
 
+/**
+ * Lazily closes out a game whose active team's clock has already run out, purely by
+ * comparing `now()` against `turnStartedAt` -- there's no persistent process here to run a
+ * real timer, so this is what stands in for one: it runs on every single read (see
+ * findGameById below, which every mutation's own preamble also goes through), so *someone*
+ * eventually polling or acting on the game is what notices and closes it, usually within
+ * a few seconds. Never mutates a game that hasn't actually timed out -- the real clock
+ * deduction for a move that arrives in time happens in move.ts/pass.ts instead, and doing
+ * it here too would double-count that same elapsed time.
+ */
+async function resolveGameClock(game: OnlineGame): Promise<OnlineGame> {
+  if (game.status !== "playing" || !game.timeControl || !game.turnStartedAt) return game;
+
+  const activeTeam = game.currentPlayer;
+  const clock = activeTeam === "black" ? game.blackClock : game.whiteClock;
+  if (!clock) return game; // this side has no clock at all (parity with local/AI exemptions)
+
+  const elapsedMs = Date.now() - new Date(game.turnStartedAt).getTime();
+  const { timedOut } = tickClock(clock, elapsedMs, game.timeControl, false);
+  if (!timedOut) return game;
+
+  try {
+    return await applyGameUpdate(game, {
+      status: "finished",
+      winner: opponent(activeTeam),
+      win_reason: "timeout",
+    });
+  } catch {
+    // Someone else's request (a real move, or another concurrent lazy check) already
+    // resolved this game first -- the optimistic-concurrency version guard rejected ours.
+    // Re-read rather than propagate: our own caller just wants the current state, and it's
+    // now settled one way or another regardless of who got there first.
+    return (await findGameById(game.id)) ?? game;
+  }
+}
+
 export async function findGameById(id: string): Promise<OnlineGame | null> {
   const supabase = getSupabaseAdmin();
   const { data, error } = await supabase.from("games").select("*").eq("id", id).maybeSingle();
   if (error) throw Errors.serverError();
   if (!data) return null;
-  return rowToGame(data as GameRow, await fetchPlayers(id));
+  const game = rowToGame(data as GameRow, await fetchPlayers(id));
+  return resolveGameClock(game);
 }
 
 async function findGameByCode(code: string): Promise<OnlineGame | null> {
@@ -182,6 +230,7 @@ export interface CreateGameInput {
   guestId: string;
   displayName: string;
   extensions: ExtensionRules;
+  timeControl: TimeControl | null;
 }
 
 export async function createGame({
@@ -192,10 +241,12 @@ export async function createGame({
   guestId,
   displayName,
   extensions,
+  timeControl,
 }: CreateGameInput): Promise<OnlineGame> {
   const supabase = getSupabaseAdmin();
   const board = createEmptyBoard(boardSize);
   const expiresAt = new Date(Date.now() + WAITING_TTL_MINUTES * 60 * 1000).toISOString();
+  const initialClock = timeControl ? createInitialClock(timeControl) : null;
 
   for (let attempt = 0; attempt < CREATE_CODE_ATTEMPTS; attempt++) {
     const code = generateGameCode();
@@ -213,6 +264,9 @@ export async function createGame({
         expires_at: expiresAt,
         extension_bombs: extensions.bombs,
         extension_stars: extensions.stars,
+        time_control: timeControl,
+        black_clock: initialClock,
+        white_clock: initialClock,
       })
       .select("*")
       .single();
@@ -430,7 +484,9 @@ export async function startGame(id: string, guestId: string | null): Promise<Onl
     throw Errors.badRequest("Hace falta al menos un jugador en cada equipo para empezar.");
   }
 
-  return applyGameUpdate(game, { status: "playing" });
+  // Arranges the real starting gun for the first mover's clock -- see
+  // resolveGameClock/move.ts/pass.ts, which all measure elapsed time from this timestamp.
+  return applyGameUpdate(game, { status: "playing", turn_started_at: new Date().toISOString() });
 }
 
 export async function leaveGame(id: string, guestId: string | null): Promise<OnlineGame> {

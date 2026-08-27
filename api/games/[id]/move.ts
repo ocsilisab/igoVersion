@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { opponent, serializeBoard } from "../../../src/utils/board.js";
 import { tryMove, MOVE_ERROR_MESSAGES } from "../../../src/utils/move.js";
 import { applyHoshiConversion, dropBomb, BOMB_INTERVAL } from "../../../src/utils/extensions.js";
+import { tickClock, type ClockState } from "../../../src/utils/clock.js";
 import { buildMutationResponse } from "../../../src/online/turns.js";
 import { withHandler, readBody } from "../../_lib/http.js";
 import { checkRateLimit } from "../../_lib/rateLimit.js";
@@ -49,6 +50,26 @@ export default withHandler(["POST"], async (req: VercelRequest, res: VercelRespo
   const result = tryMove(game.board, game.boardSize, team, { row, col }, game.history);
   if (!result.ok) throw Errors.invalidMove(MOVE_ERROR_MESSAGES[result.reason]);
 
+  // Real clock deduction for the thinking time this move took -- resolveGameClock (inside
+  // loadActiveGameForPlayer, above) already lazily catches most timeouts before a move
+  // handler ever runs, but this is the real, authoritative check for the rare case where
+  // the clock ran out in the narrow window between that read and this write.
+  let clockPatch: { black_clock?: ClockState; white_clock?: ClockState; turn_started_at?: string } = {};
+  if (game.timeControl && game.turnStartedAt) {
+    const clock = team === "black" ? game.blackClock : game.whiteClock;
+    if (clock) {
+      const elapsedMs = Date.now() - new Date(game.turnStartedAt).getTime();
+      const tick = tickClock(clock, elapsedMs, game.timeControl, true);
+      if (tick.timedOut) {
+        const updated = await applyGameUpdate(game, { status: "finished", winner: opponent(team), win_reason: "timeout" });
+        res.status(200).json(buildMutationResponse(updated, guestId));
+        return;
+      }
+      clockPatch = team === "black" ? { black_clock: tick.clock } : { white_clock: tick.clock };
+      clockPatch.turn_started_at = new Date().toISOString();
+    }
+  }
+
   // Same "estrellas"/"bombas" house rules the local modes apply — see utils/extensions.ts
   // and useGoGame.ts::placeStone, which this mirrors so the server never diverges from
   // what a local game would do with the same rules enabled.
@@ -83,6 +104,7 @@ export default withHandler(["POST"], async (req: VercelRequest, res: VercelRespo
     last_move: { row, col },
     move_count: moveCount,
     last_bomb: lastBomb,
+    ...clockPatch,
   });
 
   res.status(200).json(buildMutationResponse(updated, guestId));

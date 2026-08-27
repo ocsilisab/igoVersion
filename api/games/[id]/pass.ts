@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { opponent } from "../../../src/utils/board.js";
 import { suggestDeadGroups } from "../../../src/utils/deadStones.js";
+import { tickClock, type ClockState } from "../../../src/utils/clock.js";
 import { buildMutationResponse } from "../../../src/online/turns.js";
 import { withHandler } from "../../_lib/http.js";
 import { checkRateLimit } from "../../_lib/rateLimit.js";
@@ -20,6 +21,25 @@ export default withHandler(["POST"], async (req: VercelRequest, res: VercelRespo
   const guestId = readGuestId(req);
   const { game, team } = await loadActiveGameForPlayer(id, guestId);
 
+  // Same real clock deduction as move.ts -- see its comment for why this check exists
+  // even though resolveGameClock (inside loadActiveGameForPlayer, above) already lazily
+  // catches most timeouts before a handler like this one ever runs.
+  let clockPatch: { black_clock?: ClockState; white_clock?: ClockState; turn_started_at?: string } = {};
+  if (game.timeControl && game.turnStartedAt) {
+    const clock = team === "black" ? game.blackClock : game.whiteClock;
+    if (clock) {
+      const elapsedMs = Date.now() - new Date(game.turnStartedAt).getTime();
+      const tick = tickClock(clock, elapsedMs, game.timeControl, true);
+      if (tick.timedOut) {
+        const updated = await applyGameUpdate(game, { status: "finished", winner: opponent(team), win_reason: "timeout" });
+        res.status(200).json(buildMutationResponse(updated, guestId));
+        return;
+      }
+      clockPatch = team === "black" ? { black_clock: tick.clock } : { white_clock: tick.clock };
+      clockPatch.turn_started_at = new Date().toISOString();
+    }
+  }
+
   const consecutivePasses = game.consecutivePasses + 1;
   const turnField = team === "black" ? "black_turn_index" : "white_turn_index";
   const currentTurnIndex = team === "black" ? game.blackTurnIndex : game.whiteTurnIndex;
@@ -34,6 +54,7 @@ export default withHandler(["POST"], async (req: VercelRequest, res: VercelRespo
     // untouched — same heuristic as the local modes (see utils/deadStones.ts), and just
     // as overridable: any mark can still be toggled by hand before finalizing.
     ...(enteringScoring ? { dead_stones: Array.from(suggestDeadGroups(game.board, game.boardSize)) } : {}),
+    ...clockPatch,
   });
 
   res.status(200).json(buildMutationResponse(updated, guestId));

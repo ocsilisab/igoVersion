@@ -1,4 +1,5 @@
 import type { BoardSize, ExtensionRules, Player } from "../types/game.js";
+import type { TimeControl } from "../utils/clock.js";
 import type { ApiErrorBody, GameMutationResponse, GameResponse, OpenGamesResponse } from "./types.js";
 import { createApiRequest } from "./httpClient.js";
 
@@ -19,6 +20,7 @@ export function createOnlineGame(
   komi: number,
   creatorColor: Player,
   extensions: ExtensionRules,
+  timeControl: TimeControl | null,
   displayName?: string
 ): Promise<GameResponse> {
   return request<GameResponse>("/api/games", {
@@ -31,6 +33,7 @@ export function createOnlineGame(
       displayName,
       extensionBombs: extensions.bombs,
       extensionStars: extensions.stars,
+      timeControl,
     }),
   });
 }

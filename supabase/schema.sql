@@ -3,8 +3,8 @@
 -- Run this once in the Supabase project's SQL editor (Project → SQL Editor → New query).
 -- Safe to re-run: every statement is idempotent (IF NOT EXISTS / OR REPLACE / DROP+CREATE).
 --
--- Last change: 2026-08-26 — added check_and_record_rate_limit() and
--- dead_stones_confirmed_teams. There's no migration tooling here, so this file is the
+-- Last change: 2026-08-27 — added the game clock (time_control, black_clock, white_clock,
+-- turn_started_at, win_reason). There's no migration tooling here, so this file is the
 -- only record of what production should look like: bump this date whenever you add a
 -- statement below, and re-run the whole file in the SQL editor after pulling a change
 -- to it -- there is no automatic way to tell a deployed database's schema is behind.
@@ -67,9 +67,28 @@ create table if not exists games (
 
   status text not null default 'waiting' check (status in ('waiting', 'playing', 'finished', 'abandoned')),
   winner text check (winner in ('black', 'white', 'draw')),
+  -- Distinguishes a normal score-based ending from a clock running out (see
+  -- src/utils/clock.ts) -- null for a game that hasn't ended, or that ended before this
+  -- column existed.
+  win_reason text check (win_reason in ('score', 'timeout')),
   score jsonb,
   -- Set when a whole team's last active member leaves mid-game.
   abandoned_team text check (abandoned_team in ('black', 'white')),
+
+  -- null = untimed game (default, unchanged behavior). See src/utils/clock.ts::TimeControl
+  -- for the exact shape. Set once at creation, never changes afterwards.
+  time_control jsonb,
+  -- Per-team ClockState (src/utils/clock.ts), only meaningful when time_control is set.
+  -- A team missing a clock here never runs out of time -- not used by real online games
+  -- today (both teams always get one when time_control is set), reserved for parity with
+  -- the local/AI modes' ability to exempt a side.
+  black_clock jsonb,
+  white_clock jsonb,
+  -- When the *current* mover's clock started running -- set on startGame and refreshed on
+  -- every move/pass that advances the turn. Compared against now() on every read/mutation
+  -- (see api/_lib/gameRepo.ts::resolveGameClock) since there's no persistent process here
+  -- to run a real timer. Null while status isn't "playing" or the game is untimed.
+  turn_started_at timestamptz,
 
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -96,6 +115,11 @@ alter table games add column if not exists extension_stars boolean not null defa
 alter table games add column if not exists move_count integer not null default 0;
 alter table games add column if not exists last_bomb jsonb;
 alter table games add column if not exists dead_stones_confirmed_teams jsonb not null default '[]'::jsonb;
+alter table games add column if not exists win_reason text check (win_reason in ('score', 'timeout'));
+alter table games add column if not exists time_control jsonb;
+alter table games add column if not exists black_clock jsonb;
+alter table games add column if not exists white_clock jsonb;
+alter table games add column if not exists turn_started_at timestamptz;
 
 create unique index if not exists games_code_key on games (code);
 create index if not exists games_status_idx on games (status);

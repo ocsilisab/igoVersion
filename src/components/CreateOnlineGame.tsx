@@ -1,12 +1,14 @@
 import { useMemo, useState } from "react";
 import { BOARD_SIZES, type BoardSize, type ExtensionRules, type Player, type TeamRoster } from "../types/game";
 import { DEFAULT_KOMI, MIN_TOTAL_PLAYERS, MAX_TOTAL_PLAYERS, NO_EXTENSIONS } from "../types/game";
+import type { TimeControl } from "../utils/clock";
 import { assignSeatTeams } from "../online/teamAssignment";
 import { createOnlineGame, joinOnlineGame, joinOnlineGameById, OnlineApiError } from "../online/api";
 import { useOpenGames } from "../online/useOpenGames";
 import KomiSelector from "./KomiSelector";
 import TeamSplitPreview from "./TeamSplitPreview";
 import ExtensionsSelector from "./ExtensionsSelector";
+import TimeControlSelector from "./TimeControlSelector";
 import OpenGamesPanel from "./OpenGamesPanel";
 import "./GameSetup.css";
 import "./CreateOnlineGame.css";
@@ -23,6 +25,7 @@ export default function CreateOnlineGame({ onCancel, onEntered }: CreateOnlineGa
   const [creatorColor, setCreatorColor] = useState<Player>("black");
   const [komi, setKomi] = useState<number>(DEFAULT_KOMI);
   const [extensions, setExtensions] = useState<ExtensionRules>(NO_EXTENSIONS);
+  const [timeControl, setTimeControl] = useState<TimeControl | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +59,7 @@ export default function CreateOnlineGame({ onCancel, onEntered }: CreateOnlineGa
         komi,
         creatorColor,
         extensions,
+        timeControl,
         displayName.trim() || undefined
       );
       onEntered(game.id);
@@ -180,6 +184,8 @@ export default function CreateOnlineGame({ onCancel, onEntered }: CreateOnlineGa
         <KomiSelector komi={komi} onSelect={setKomi} disabled={busy} />
 
         <ExtensionsSelector extensions={extensions} onChange={setExtensions} disabled={busy} />
+
+        <TimeControlSelector value={timeControl} onChange={setTimeControl} disabled={busy} />
 
         <section className="setup-section">
           <h2>Tu nombre (opcional)</h2>

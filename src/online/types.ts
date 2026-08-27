@@ -1,4 +1,5 @@
 import type { Board, BoardSize, ExtensionRules, Player, ScoreResult } from "../types/game.js";
+import type { ClockState, TimeControl } from "../utils/clock.js";
 
 /**
  * Identity kind. Only "guest" is usable today — see REGISTRATION_ENABLED.
@@ -74,8 +75,21 @@ export interface OnlineGame {
 
   status: OnlineGameStatus;
   winner: Player | "draw" | null;
+  /** Distinguishes a normal score-based ending from a clock running out. Null while the
+   * game hasn't ended (or ended before this field existed). */
+  winReason: "score" | "timeout" | null;
   score: ScoreResult | null;
   abandonedTeam: Player | null;
+
+  /** null = untimed game. Set once at creation, never changes afterwards. */
+  timeControl: TimeControl | null;
+  /** Only meaningful when `timeControl` is set. */
+  blackClock: ClockState | null;
+  whiteClock: ClockState | null;
+  /** When the *current* mover's clock started running -- server-authoritative; the client
+   * only ever uses this to project a live display forward via Date.now(), never to decide
+   * anything itself. Null while untimed or the game hasn't started. */
+  turnStartedAt: string | null;
 
   players: OnlinePlayer[];
   /** Reserved seats nobody has claimed yet — always `maxPlayers - players.length` of them. */
